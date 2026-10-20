@@ -8,8 +8,10 @@ format:
 
 alias fmt := format
 
-# Check the working tree directly (no store copy). The flake's
-# checks.formatting output exists for CI, where a store copy is acceptable.
+# The flake's checks.formatting output exists for CI, where a store copy
+# is acceptable; day to day, check the live tree instead.
+
+# Check the working tree directly (no store copy)
 check:
     treefmt --ci
 
@@ -33,33 +35,16 @@ run *ARGS: build
 
 alias start := run
 
-# Regenerate .zed/tasks.json so Zed's task runner mirrors this Justfile,
-# plus a create_worktree hook that primes new worktrees via init-worktree.
-# Re-run after adding or renaming recipes.
-zed-tasks:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    mkdir -p .zed
-    {
-      echo '['
-      printf '  { "label": "init worktree (create_worktree hook)", "command": "just", "args": ["init-worktree", "$ZED_WORKTREE_ROOT"], "hooks": ["create_worktree"], "reveal": "no_focus", "hide": "on_success" }'
-      for recipe in $(just --summary); do
-        printf ',\n  { "label": "just %s", "command": "just", "args": ["%s"] }' "$recipe" "$recipe"
-      done
-      printf '\n]\n'
-    } > .zed/tasks.json
-    echo "wrote .zed/tasks.json ($(just --summary | wc -w | tr -d ' ') tasks + 1 hook)"
-
-# Create a git worktree under .worktree/<issue>-<slug> on a matching branch
-# and prime direnv in it
+# Create a worktree at .worktree/<issue>-<slug> on a matching branch, then prime it
 worktree issue slug:
     git worktree add .worktree/{{ issue }}-{{ slug }} -b {{ issue }}-{{ slug }}
     just init-worktree .worktree/{{ issue }}-{{ slug }}
 
-# Prime a freshly created worktree (or any new checkout): copy .env from
-# the main worktree (it's gitignored, so worktrees start without it), then
-# allow + reload direnv. Zed runs this automatically via its
-# create_worktree hook (see .zed/tasks.json).
+# Copies .env from the main worktree (gitignored, so absent in fresh
+# worktrees), then direnv allow + reload. Zed runs this automatically via
+# its create_worktree hook (see .zed/tasks.json).
+
+# Prime a freshly created worktree (or any new checkout)
 init-worktree dir=".":
     #!/usr/bin/env bash
     set -euo pipefail
