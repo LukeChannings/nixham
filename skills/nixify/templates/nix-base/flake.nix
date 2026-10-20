@@ -30,7 +30,12 @@
 
         checks.formatting = treefmt.config.build.check self;
 
-        devShells.default = pkgs.mkShell { };
+        devShells.default = pkgs.mkShell {
+          packages = [
+            pkgs.just
+            treefmt.config.build.wrapper
+          ];
+        };
       }
     );
 }

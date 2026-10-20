@@ -1,0 +1,33 @@
+# List available recipes
+default:
+    @just --list
+
+# Format the tree
+format:
+    treefmt
+
+alias fmt := format
+
+# Run all checks (formatting, package checks, ...)
+check:
+    nix-build --no-out-link -A checks.$(nix-instantiate --eval --expr builtins.currentSystem | tr -d '"')
+
+alias lint := check
+
+# If the project distinguishes unit and integration tests, split into
+# `test-unit` and `test-integration` recipes and make `test` run both:
+#   test: test-unit test-integration
+
+# Run the test suite
+test:
+    @echo 'CHANGEME: wire up the test runner' >&2; exit 1
+
+# Build the default package
+build:
+    nix-build -A default
+
+# Run the default package (set the binary name once packages.default exists)
+run *ARGS: build
+    ./result/bin/CHANGEME {{ ARGS }}
+
+alias start := run
