@@ -8,9 +8,10 @@ format:
 
 alias fmt := format
 
-# Run all checks (formatting, package checks, ...)
+# Check the working tree directly (no store copy). The flake's
+# checks.formatting output exists for CI, where a store copy is acceptable.
 check:
-    nix-build --no-out-link -A checks.$(nix-instantiate --eval --expr builtins.currentSystem | tr -d '"')
+    treefmt --ci
 
 alias lint := check
 
