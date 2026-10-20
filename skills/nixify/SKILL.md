@@ -5,7 +5,7 @@ description: Set up or normalize Nix configuration in a directory — from a min
 
 # Nixify
 
-Templates are bundled under [`templates/`](templates/) (resolve relative to this skill directory): `nix-base/` for flake scenarios, `simple-shell/` for scenario 1a. `nix-base` is the source of truth for conventions. Read every template file before acting: `flake.nix`, `default.nix`, `shell.nix`, `.envrc`, `treefmt.nix`, `Justfile`, `.gitignore`, `.zed/tasks.json` (the `create_worktree` hook — nothing else; Zed's `just` extension supplies recipe tasks).
+Templates are bundled under [`templates/`](templates/) (resolve relative to this skill directory): `nix-base/` for flake scenarios, `simple-shell/` for scenario 1a. `nix-base` is the source of truth for conventions. Read every template file before acting: `flake.nix`, `default.nix`, `shell.nix`, `.envrc`, `treefmt.nix`, `Justfile`, `.gitignore`, `.zed/tasks.json` (Title-case recipe tasks + the `create_worktree` hook).
 
 **Core convention — flakes for inputs, vanilla nix for everything else.** The flake exists to pin inputs (`flake.lock`); day-to-day building and running goes through the flake-compat shim with `nix-build` / `nix-shell`, never `nix build` / `nix develop` / `nix flake check`. Flake commands copy the entire source tree to the store on every invocation, which is very expensive; `default.nix` sets `copySourceTreeToStore = false` to avoid exactly that. `.envrc` uses `use_nix` (not `use flake`) for the same reason. `nix flake lock` is fine — it only manages the lock file.
 
@@ -13,7 +13,7 @@ Templates are bundled under [`templates/`](templates/) (resolve relative to this
 
 Two meta recipes ride along: `worktree <issue> <slug>` creates a git worktree under `.worktree/<issue>-<slug>/` on a matching branch and primes it via `init-worktree`. `init-worktree` is the single entry point for priming any new worktree/checkout: it copies `.env` from the main worktree (gitignored, so absent otherwise), then runs `direnv allow` + `direnv reload`.
 
-In Zed, recipe tasks come from the `just` extension — `.zed/tasks.json` must NOT mirror the Justfile (that duplicates every entry in the task picker). It contains exactly one task: a [`create_worktree` hook](https://zed.dev/docs/tasks#hooks) running `just init-worktree $ZED_WORKTREE_ROOT`, so Zed-created worktrees are primed automatically.
+`.zed/tasks.json` maps the core recipes to Title-case task labels — `Build` → `just build`, `Check`, `Format`, `Test`, `Run` — never `just <recipe>` labels (those collide with the tasks Zed's `just` extension generates, duplicating every picker entry). Meta/parameterised recipes (`default`, `worktree`, `init-worktree`) are not mapped. The file also carries a [`create_worktree` hook](https://zed.dev/docs/tasks#hooks) running `just init-worktree $ZED_WORKTREE_ROOT`, so Zed-created worktrees are primed automatically.
 
 ## Decide which scenario applies
 

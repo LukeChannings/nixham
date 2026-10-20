@@ -14,7 +14,7 @@ Goal: the repo ends up structurally identical to [`templates/nix-base/`](templat
 | `treefmt.nix` | Standalone module, `projectRootFile = "flake.nix"`, at minimum `programs.nixfmt.enable = true` and `programs.just.enable = true`. |
 | `.gitignore`  | Ignores `result` / `result-*` (nix-build symlinks), `.direnv/` (direnv cache), `.env` (loaded by `dotenv_if_exists`, never committed), `.worktree/` (worktree checkouts). |
 | `Justfile`    | Stable recipe names for common operations: `check` (alias `lint`), `build`, `run` (alias `start`), `format` (alias `fmt`), `test` (plus `test-unit`/`test-integration` when the suite distinguishes them; `test` runs both). Bodies use vanilla nix (`nix-build`) or the ecosystem's native dev commands. `just` and the treefmt wrapper are standard devShell dependencies. Meta recipes: `worktree <issue> <slug>` / `init-worktree` (worktrees under `.worktree/<issue>-<slug>/`; priming = copy `.env` from the main worktree, `direnv allow`, `direnv reload`). |
-| `.zed/tasks.json` | Exactly one task: the `create_worktree` hook running `just init-worktree $ZED_WORKTREE_ROOT`. Recipe tasks come from Zed's `just` extension — mirroring the Justfile here duplicates every picker entry. |
+| `.zed/tasks.json` | Title-case tasks for the core recipes (`Build`, `Check`, `Format`, `Test`, `Run` → `just <recipe>`), plus the `create_worktree` hook running `just init-worktree $ZED_WORKTREE_ROOT`. No `just <recipe>` labels (they collide with Zed's `just` extension tasks); meta/parameterised recipes aren't mapped. |
 
 ## Audit checklist
 
@@ -25,7 +25,7 @@ Goal: the repo ends up structurally identical to [`templates/nix-base/`](templat
 - [ ] `shell.nix` contains real config (packages, env vars, shellHooks)? Hoist into `devShells.default` in `flake.nix`, then reduce `shell.nix` to the one-line delegate.
 - [ ] `.envrc` watches all four nix files? Uses `dotenv_if_exists`?
 - [ ] `.gitignore` covers `result`, `result-*`, `.direnv/`, `.env`? Merge missing entries in.
-- [ ] `.zed/tasks.json` present, containing only the `create_worktree` hook? If it mirrors Justfile recipes, strip them — Zed's `just` extension already provides those tasks, so a mirror shows every task twice.
+- [ ] `.zed/tasks.json` present, with Title-case core-recipe tasks and the `create_worktree` hook? Rename any `just <recipe>` labels (they collide with Zed's `just` extension tasks, showing every task twice) and drop entries for meta/parameterised recipes.
 - [ ] Has a `Justfile` with the standard recipe names? If the repo has ad-hoc scripts or a Makefile for check/build/run, mirror them as `just` recipes (keep the originals unless asked); ensure `just` is in the devShell.
 - [ ] Formatter wired up? If no treefmt, add `treefmt.nix` + the `formatter`/`checks.formatting` outputs. If the repo has its own formatter config (e.g. `.prettierrc`), enable the matching treefmt program rather than replacing config.
 - [ ] Per-system boilerplate hand-rolled? Prefer `flake-utils.lib.eachDefaultSystem` for plain package+devshell repos. If the repo exports NixOS/nix-darwin modules or configurations, flake-parts with its `modules` flake module is the convention instead — see the modules section of [ECOSYSTEMS.md](ECOSYSTEMS.md). If it already uses flake-parts consistently, keep it; don't downgrade to flake-utils.
