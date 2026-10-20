@@ -1,0 +1,15 @@
+[
+  { "label": "Build", "command": "just", "args": ["build"] },
+  { "label": "Check", "command": "just", "args": ["check"] },
+  { "label": "Format", "command": "just", "args": ["format"] },
+  { "label": "Test", "command": "just", "args": ["test"] },
+  { "label": "Run", "command": "just", "args": ["run"] },
+  {
+    "label": "Initialise worktree",
+    "command": "just",
+    "args": ["init-worktree", "$ZED_WORKTREE_ROOT"],
+    "hooks": ["create_worktree"],
+    "reveal": "no_focus",
+    "hide": "on_success"
+  }
+]

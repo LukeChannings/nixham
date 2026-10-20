@@ -1,7 +1,7 @@
 { lib, stdenvNoCC }:
 stdenvNoCC.mkDerivation {
   pname = "nixham-skill-nixify";
-  version = "0";
+  version = "1";
 
   src = lib.fileset.toSource {
     root = ./.;
@@ -13,8 +13,8 @@ stdenvNoCC.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    mkdir -p $out/share/skills/nixify
-    cp -r . $out/share/skills/nixify
+    mkdir -p $out/skills/nixify
+    cp -r . $out/skills/nixify
     runHook postInstall
   '';
 }
