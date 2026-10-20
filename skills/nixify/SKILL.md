@@ -19,6 +19,8 @@ Two meta recipes ride along: `zed-tasks` regenerates `.zed/tasks.json` so [Zed's
 2. **Code repo with no nix files** → full flake from nix-base, plus a package derivation for the project.
 3. **Directory with existing nix config** → converge toward nix-base conventions. See [REFERENCE.md](REFERENCE.md).
 
+Re-running nixify is always scenario 3: re-assess the current structure against these standards, even if nixify set it up originally.
+
 ## Scenario 1a: Simple dev shell (no flake)
 
 Ask which programs they want available. Copy [`templates/simple-shell/`](templates/simple-shell/) (`shell.nix`, `.envrc`, `.gitignore`), fill the requested programs into `packages`, then `direnv allow`. No flake, no lock file — uses the system's `<nixpkgs>`.
@@ -36,7 +38,7 @@ Ask which programs they want available. Copy [`templates/simple-shell/`](templat
 Start from Scenario 1b, then:
 
 1. Detect the ecosystem (package.json, Cargo.toml, go.mod, pyproject.toml, *.cabal, etc.).
-2. Follow [ECOSYSTEMS.md](ECOSYSTEMS.md) for the builder, devshell toolchain, and formatter for that ecosystem (JS/TS → buildNpmPackage + biome, Rust → crane, Python → nixpkgs python devshell + pyproject.nix, Go → buildGoModule). Set `packages.default`.
+2. Follow [ECOSYSTEMS.md](ECOSYSTEMS.md) for the builder, devshell toolchain, and formatter for that ecosystem (JS/TS → buildNpmPackage + biome, Rust → crane, Python → nixpkgs python devshell + pyproject.nix, Go → buildGoModule). Each in-repo package's derivation lives in a `package.nix` at that package's root (repo root for a single-package repo), wired in `flake.nix` with `pkgs.callPackage ./path/to/package.nix { }` — never inlined in `flake.nix` or collected in a central `packages/` directory. Set `packages.default`.
 3. Extend `treefmt.nix` with formatters already used by the project — consult the treefmt-nix repo for available programs; don't introduce new formatters uninvited.
 4. Fill in the `Justfile`: set the binary name in `run`, wire `test` to the project's test runner (splitting into `test-unit`/`test-integration` if the suite distinguishes them, with `test` running both), and adapt recipe bodies to the ecosystem's native commands where that's the better dev loop (e.g. `cargo build`) — but keep the recipe names stable. Run `just zed-tasks` after any recipe changes.
 5. If the package is a daemon/service, offer an accompanying NixOS or nix-darwin module (pattern in [ECOSYSTEMS.md](ECOSYSTEMS.md)).

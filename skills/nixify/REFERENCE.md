@@ -6,7 +6,8 @@ Goal: the repo ends up structurally identical to [`templates/nix-base/`](templat
 
 | File          | Invariant                                                                                                    |
 | ------------- | ------------------------------------------------------------------------------------------------------------ |
-| `flake.nix`   | Single source of truth. Inputs: nixpkgs, flake-utils, flake-compat (lix fork, `flake = false`), treefmt-nix. Outputs via `flake-utils.lib.eachDefaultSystem`: `packages`, `formatter` (treefmt wrapper), `checks.formatting`, `devShells.default`. |
+| `flake.nix`   | Single source of truth. Inputs: nixpkgs, flake-utils, flake-compat (lix fork, `flake = false`), treefmt-nix. Outputs via `flake-utils.lib.eachDefaultSystem`: `packages`, `formatter` (treefmt wrapper), `checks.formatting`, `devShells.default`. `packages` entries are `pkgs.callPackage` of per-package `package.nix` files, not inline derivations. |
+| `package.nix` | One per in-repo package, at that package's root (repo root for a single-package repo). Receives its dependencies via `callPackage` injection. |
 | `default.nix` | flake-compat shim. Pins flake-compat by reading `flake.lock` (no hardcoded rev). Sets `copySourceTreeToStore = false` — the flake exists to pin inputs, but building/running goes through vanilla `nix-build`/`nix-shell`, because flake commands copy the whole source tree to the store per invocation. Returns `flake.defaultNix // packages.${system}` so `nix-build -A <pkg>` works. |
 | `shell.nix`   | One line: `(import ./. { }).devShells.${builtins.currentSystem}.default` — delegates to the flake devshell. |
 | `.envrc`      | `dotenv_if_exists`, `watch_file flake.nix flake.lock shell.nix default.nix`, `use_nix` (never `use flake` — same store-copy cost). |
@@ -17,6 +18,7 @@ Goal: the repo ends up structurally identical to [`templates/nix-base/`](templat
 
 ## Audit checklist
 
+- [ ] Package derivations inlined in `flake.nix`, or collected in a central `packages/` directory? Each belongs in a `package.nix` at its package's root, wired via `pkgs.callPackage`. Move and rewire.
 - [ ] Has `flake.nix`? If not but has `shell.nix`/`default.nix` with real content → Scenario 2 shape: create the flake, hoist content in (below).
 - [ ] Uses flake-compat? If `default.nix`/`shell.nix` hardcode a flake-compat rev or use the edolstra upstream, replace with nix-base's lock-file-reading `default.nix`.
 - [ ] `shell.nix` contains real config (packages, env vars, shellHooks)? Hoist into `devShells.default` in `flake.nix`, then reduce `shell.nix` to the one-line delegate.
