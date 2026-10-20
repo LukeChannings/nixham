@@ -11,6 +11,7 @@ Goal: the repo ends up structurally identical to [`templates/nix-base/`](templat
 | `shell.nix`   | One line: `(import ./. { }).devShells.${builtins.currentSystem}.default` — delegates to the flake devshell. |
 | `.envrc`      | `dotenv_if_exists`, `watch_file flake.nix flake.lock shell.nix default.nix`, `use_nix` (never `use flake` — same store-copy cost). |
 | `treefmt.nix` | Standalone module, `projectRootFile = "flake.nix"`, at minimum `programs.nixfmt.enable = true` and `programs.just.enable = true`. |
+| `.gitignore`  | Ignores `result` / `result-*` (nix-build symlinks), `.direnv/` (direnv cache), `.env` (loaded by `dotenv_if_exists`, never committed). |
 | `Justfile`    | Stable recipe names for common operations: `check` (alias `lint`), `build`, `run` (alias `start`), `format` (alias `fmt`), `test` (plus `test-unit`/`test-integration` when the suite distinguishes them; `test` runs both). Bodies use vanilla nix (`nix-build`) or the ecosystem's native dev commands. `just` and the treefmt wrapper are standard devShell dependencies. |
 
 ## Audit checklist
@@ -19,6 +20,7 @@ Goal: the repo ends up structurally identical to [`templates/nix-base/`](templat
 - [ ] Uses flake-compat? If `default.nix`/`shell.nix` hardcode a flake-compat rev or use the edolstra upstream, replace with nix-base's lock-file-reading `default.nix`.
 - [ ] `shell.nix` contains real config (packages, env vars, shellHooks)? Hoist into `devShells.default` in `flake.nix`, then reduce `shell.nix` to the one-line delegate.
 - [ ] `.envrc` watches all four nix files? Uses `dotenv_if_exists`?
+- [ ] `.gitignore` covers `result`, `result-*`, `.direnv/`, `.env`? Merge missing entries in.
 - [ ] Has a `Justfile` with the standard recipe names? If the repo has ad-hoc scripts or a Makefile for check/build/run, mirror them as `just` recipes (keep the originals unless asked); ensure `just` is in the devShell.
 - [ ] Formatter wired up? If no treefmt, add `treefmt.nix` + the `formatter`/`checks.formatting` outputs. If the repo has its own formatter config (e.g. `.prettierrc`), enable the matching treefmt program rather than replacing config.
 - [ ] Per-system boilerplate hand-rolled? Prefer `flake-utils.lib.eachDefaultSystem` for plain package+devshell repos. If the repo exports NixOS/nix-darwin modules or configurations, flake-parts with its `modules` flake module is the convention instead — see the modules section of [ECOSYSTEMS.md](ECOSYSTEMS.md). If it already uses flake-parts consistently, keep it; don't downgrade to flake-utils.
