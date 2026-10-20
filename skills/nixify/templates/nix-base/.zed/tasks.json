@@ -1,0 +1,11 @@
+[
+  { "label": "just build", "command": "just", "args": ["build"] },
+  { "label": "just check", "command": "just", "args": ["check"] },
+  { "label": "just default", "command": "just", "args": ["default"] },
+  { "label": "just format", "command": "just", "args": ["format"] },
+  { "label": "just init-worktree", "command": "just", "args": ["init-worktree"] },
+  { "label": "just run", "command": "just", "args": ["run"] },
+  { "label": "just test", "command": "just", "args": ["test"] },
+  { "label": "just worktree", "command": "just", "args": ["worktree"] },
+  { "label": "just zed-tasks", "command": "just", "args": ["zed-tasks"] }
+]

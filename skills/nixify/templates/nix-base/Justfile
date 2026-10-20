@@ -32,3 +32,30 @@ run *ARGS: build
     ./result/bin/CHANGEME {{ ARGS }}
 
 alias start := run
+
+# Regenerate .zed/tasks.json so Zed's task runner mirrors this Justfile.
+# Re-run after adding or renaming recipes.
+zed-tasks:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p .zed
+    {
+      echo '['
+      sep=''
+      for recipe in $(just --summary); do
+        printf '%b  { "label": "just %s", "command": "just", "args": ["%s"] }' "$sep" "$recipe" "$recipe"
+        sep=',\n'
+      done
+      printf '\n]\n'
+    } > .zed/tasks.json
+    echo "wrote .zed/tasks.json ($(just --summary | wc -w | tr -d ' ') tasks)"
+
+# Create a git worktree under .worktree/<issue>-<slug> on a matching branch
+# and prime direnv in it
+worktree issue slug:
+    git worktree add .worktree/{{ issue }}-{{ slug }} -b {{ issue }}-{{ slug }}
+    just init-worktree .worktree/{{ issue }}-{{ slug }}
+
+# Prime direnv in a freshly created worktree (or any new checkout)
+init-worktree dir=".":
+    cd {{ dir }} && direnv allow && direnv reload
