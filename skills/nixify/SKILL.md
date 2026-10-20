@@ -7,7 +7,7 @@ description: Set up or normalize Nix configuration in a directory — from a min
 
 Templates are bundled under [`templates/`](templates/) (resolve relative to this skill directory): `nix-base/` for flake scenarios, `simple-shell/` for scenario 1a. `nix-base` is the source of truth for conventions. Read every template file before acting: `flake.nix`, `default.nix`, `shell.nix`, `.envrc`, `treefmt.nix`, `Justfile`, `.gitignore`, `.zed/tasks.json` (Title-case recipe tasks + the `create_worktree` hook).
 
-**Dotfiles are stored inert with a `dot-` prefix** (`dot-envrc`, `dot-gitignore`, `dot-zed/`) so that git, direnv, and Zed don't treat the templates as live config in the repo hosting this skill. Always rename `dot-*` → `.*` when copying into a target.
+**Config files are stored inert** so that git, direnv, and Zed don't treat the templates as live config in the repo hosting this skill: dotfiles carry a `dot-` prefix (`dot-envrc`, `dot-gitignore`; rename `dot-*` → `.*` on copy), and `zed-tasks.json` is flat (copy to `.zed/tasks.json`).
 
 **Core convention — flakes for inputs, vanilla nix for everything else.** The flake exists to pin inputs (`flake.lock`); day-to-day building and running goes through the flake-compat shim with `nix-build` / `nix-shell`, never `nix build` / `nix develop` / `nix flake check`. Flake commands copy the entire source tree to the store on every invocation, which is very expensive; `default.nix` sets `copySourceTreeToStore = false` to avoid exactly that. `.envrc` uses `use_nix` (not `use flake`) for the same reason. `nix flake lock` is fine — it only manages the lock file.
 
@@ -31,7 +31,7 @@ Ask which programs they want available. Copy [`templates/simple-shell/`](templat
 
 ## Scenario 1b: Full flake in empty directory
 
-1. Copy the full nix-base template (renaming `dot-*` → `.*`, so `dot-zed/tasks.json` lands at `.zed/tasks.json`). In an existing repo, merge the `.gitignore` entries (`result`, `result-*`, `.direnv/`, `.env`) into any existing ignore file instead of overwriting.
+1. Copy the full nix-base template (renaming `dot-*` → `.*`; `zed-tasks.json` → `.zed/tasks.json`). In an existing repo, merge the `.gitignore` entries (`result`, `result-*`, `.direnv/`, `.env`) into any existing ignore file instead of overwriting.
 2. If not a git repo, ask whether to `git init` (flakes require tracked files; without git, plain directories work but warn about it).
 3. In a git repo: `git add` the nix files **before** locking — flakes ignore untracked files.
 4. Run `nix flake lock`. `default.nix` reads `flake.lock`, so the lock must exist before `nix-shell`/`shell.nix` works.
