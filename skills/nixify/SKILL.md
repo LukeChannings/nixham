@@ -11,7 +11,7 @@ Templates are bundled under [`templates/`](templates/) (resolve relative to this
 
 **Common operations are standardised with [`just`](https://just.systems/man/).** `just` is a standard dependency in every devShell, and a `Justfile` provides stable recipe names wrapping the appropriate commands: `check` (alias `lint`), `build`, `run` (alias `start`), `format` (alias `fmt`), and `test`. When the project distinguishes unit from integration tests, add `test-unit` and `test-integration`, with `test` running both.
 
-Two meta recipes ride along: `zed-tasks` regenerates `.zed/tasks.json` so [Zed's task runner](https://zed.dev/docs/tasks) mirrors the Justfile (re-run it whenever recipes change), and `worktree <issue> <slug>` creates a git worktree under `.worktree/<issue>-<slug>/` on a matching branch, then primes it with `direnv allow` + `direnv reload` (`init-worktree` does just the priming for an existing checkout).
+Two meta recipes ride along: `zed-tasks` regenerates `.zed/tasks.json` so [Zed's task runner](https://zed.dev/docs/tasks) mirrors the Justfile (re-run it whenever recipes change), and `worktree <issue> <slug>` creates a git worktree under `.worktree/<issue>-<slug>/` on a matching branch and primes it via `init-worktree`. `init-worktree` is the single entry point for priming any new worktree/checkout: it copies `.env` from the main worktree (gitignored, so absent otherwise), then runs `direnv allow` + `direnv reload`. The generated tasks.json includes a [`create_worktree` hook](https://zed.dev/docs/tasks#hooks) so Zed runs `just init-worktree $ZED_WORKTREE_ROOT` automatically for worktrees it creates.
 
 ## Decide which scenario applies
 

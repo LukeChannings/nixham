@@ -33,7 +33,8 @@ run *ARGS: build
 
 alias start := run
 
-# Regenerate .zed/tasks.json so Zed's task runner mirrors this Justfile.
+# Regenerate .zed/tasks.json so Zed's task runner mirrors this Justfile,
+# plus a create_worktree hook that primes new worktrees via init-worktree.
 # Re-run after adding or renaming recipes.
 zed-tasks:
     #!/usr/bin/env bash
@@ -41,14 +42,13 @@ zed-tasks:
     mkdir -p .zed
     {
       echo '['
-      sep=''
+      printf '  { "label": "init worktree (create_worktree hook)", "command": "just", "args": ["init-worktree", "$ZED_WORKTREE_ROOT"], "hooks": ["create_worktree"], "reveal": "no_focus", "hide": "on_success" }'
       for recipe in $(just --summary); do
-        printf '%b  { "label": "just %s", "command": "just", "args": ["%s"] }' "$sep" "$recipe" "$recipe"
-        sep=',\n'
+        printf ',\n  { "label": "just %s", "command": "just", "args": ["%s"] }' "$recipe" "$recipe"
       done
       printf '\n]\n'
     } > .zed/tasks.json
-    echo "wrote .zed/tasks.json ($(just --summary | wc -w | tr -d ' ') tasks)"
+    echo "wrote .zed/tasks.json ($(just --summary | wc -w | tr -d ' ') tasks + 1 hook)"
 
 # Create a git worktree under .worktree/<issue>-<slug> on a matching branch
 # and prime direnv in it
@@ -56,6 +56,15 @@ worktree issue slug:
     git worktree add .worktree/{{ issue }}-{{ slug }} -b {{ issue }}-{{ slug }}
     just init-worktree .worktree/{{ issue }}-{{ slug }}
 
-# Prime direnv in a freshly created worktree (or any new checkout)
+# Prime a freshly created worktree (or any new checkout): copy .env from
+# the main worktree (it's gitignored, so worktrees start without it), then
+# allow + reload direnv. Zed runs this automatically via its
+# create_worktree hook (see .zed/tasks.json).
 init-worktree dir=".":
-    cd {{ dir }} && direnv allow && direnv reload
+    #!/usr/bin/env bash
+    set -euo pipefail
+    main="$(git worktree list --porcelain | head -1 | cut -d' ' -f2-)"
+    if [ -f "$main/.env" ] && [ ! -e "{{ dir }}/.env" ]; then
+      cp "$main/.env" "{{ dir }}/.env"
+    fi
+    cd "{{ dir }}" && direnv allow && direnv reload
