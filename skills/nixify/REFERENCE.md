@@ -19,7 +19,7 @@ Goal: the repo ends up structurally identical to [`templates/nix-base/`](templat
 ## Audit checklist
 
 - [ ] Package derivations inlined in `flake.nix`? Move each to a `package.nix`, wired via `pkgs.callPackage`.
-- [ ] Does anything in a central `packages/` directory package code that lives elsewhere in the repo (e.g. `src = ../some/dir`)? Move it to a `package.nix` at that code's root and rewire. Entries that vendor out-of-repo software, or that are implemented entirely within `packages/`, stay put.
+- [ ] Does anything in a central `packages/` directory package code that lives elsewhere in the repo (e.g. `src = ../some/dir`)? Move that file to a `package.nix` at that code's root and rewire. Entries that vendor out-of-repo software, or that are implemented entirely within `packages/`, stay put — and the `packages/` directory itself always stays in place, even if a move empties it.
 - [ ] Has `flake.nix`? If not but has `shell.nix`/`default.nix` with real content → Scenario 2 shape: create the flake, hoist content in (below).
 - [ ] Uses flake-compat? If `default.nix`/`shell.nix` hardcode a flake-compat rev or use the edolstra upstream, replace with nix-base's lock-file-reading `default.nix`.
 - [ ] `shell.nix` contains real config (packages, env vars, shellHooks)? Hoist into `devShells.default` in `flake.nix`, then reduce `shell.nix` to the one-line delegate.
