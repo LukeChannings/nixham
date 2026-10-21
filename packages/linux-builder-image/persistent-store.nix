@@ -141,14 +141,4 @@ in
   systemd.services.register-nix-paths.enable = mkForce false;
 
   systemd.shutdown.linux-builder-sync-volume = syncVolume;
-
-  # Stable across restarts and image upgrades when the volume is attached;
-  # without it /persist is a plain rootfs directory and the key as ephemeral
-  # as the store.
-  services.openssh.hostKeys = [
-    {
-      type = "ed25519";
-      path = "${persist}/ssh/ssh_host_ed25519_key";
-    }
-  ];
 }

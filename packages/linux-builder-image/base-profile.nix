@@ -14,6 +14,13 @@ let
   # Root-only and in RAM, so private keys and tokens never reach a disk.
   snapshot = "/run/linux-builder";
 
+  # sshd's one ed25519 host key, linked at boot to the mounted one or else to
+  # the persisted one: stable across restarts and image upgrades when the
+  # store volume is attached; without it /persist is a plain rootfs
+  # directory and the key as ephemeral as the store.
+  hostKey = "${snapshot}/ssh_host_ed25519_key";
+  persistedHostKey = "/persist/ssh/ssh_host_ed25519_key";
+
   runtimeConfig = pkgs.writeShellScript "linux-builder-runtime-config" ''
     set -u
     export PATH=${lib.makeBinPath [ pkgs.coreutils ]}
@@ -48,6 +55,12 @@ let
         chmod 0711 ${snapshot}/config/ssh
         chmod -R go+rX ${snapshot}/config/ssh/authorized_keys.d
       fi
+    fi
+
+    if [ -f ${snapshot}/config/ssh/ssh_host_ed25519_key ]; then
+      ln -s config/ssh/ssh_host_ed25519_key ${hostKey}
+    else
+      ln -s ${persistedHostKey} ${hostKey}
     fi
 
     applied=()
@@ -159,6 +172,14 @@ in
 
   security.pam.services.sshd.startSession = mkForce false;
 
+  # Runs only while ${hostKey} links to nothing, i.e. to a persisted key yet
+  # to be generated; not in stage 2, where root has no passwd entry yet.
+  systemd.services.sshd-keygen.script = mkForce ''
+    rm -f ${persistedHostKey} ${persistedHostKey}.pub
+    mkdir -p "$(dirname ${persistedHostKey})"
+    ssh-keygen -q -t ed25519 -N "" -f ${persistedHostKey}
+  '';
+
   systemd.services.tcp-quickack = {
     description = "Disable delayed ACKs on the runtime's routes";
     wantedBy = [ "network.target" ];
@@ -179,6 +200,12 @@ in
   services.openssh = {
     enable = true;
     startWhenNeeded = false;
+    hostKeys = [
+      {
+        type = "ed25519";
+        path = hostKey;
+      }
+    ];
     authorizedKeysFiles = [ "${snapshot}/config/ssh/authorized_keys.d/%u" ];
     settings = {
       PermitRootLogin = mkDefault "no";
