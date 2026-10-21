@@ -1,0 +1,7 @@
+---
+self-hosted-runner:
+  labels:
+    - nixos-latest
+    - nixos-latest-x86_64
+    - nixos-latest-arm64
+    - macos-arm64

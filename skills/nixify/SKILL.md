@@ -43,7 +43,7 @@ Start from Scenario 1b, then:
 
 1. Detect the ecosystem (package.json, Cargo.toml, go.mod, pyproject.toml, *.cabal, etc.).
 2. Follow [ECOSYSTEMS.md](ECOSYSTEMS.md) for the builder, devshell toolchain, and formatter for that ecosystem (JS/TS → buildNpmPackage + biome, Rust → crane, Python → nixpkgs python devshell + pyproject.nix, Go → buildGoModule). The packaging rule is **colocation**: a derivation that packages an in-repo source tree lives with that tree, as a `package.nix` at its root (repo root for a single-package repo), wired in `flake.nix` with `pkgs.callPackage ./path/to/package.nix { }` — never inlined in `flake.nix`. A central `packages/` directory is for everything else: vendored out-of-repo software and packages implemented entirely within it (`packages/<foo>/package.nix` whose source *is* there is fine; `packages/foo.nix` reaching into `../some/dir` is not). Set `packages.default`.
-3. Extend `treefmt.nix` with formatters already used by the project — consult the treefmt-nix repo for available programs; don't introduce new formatters uninvited.
+3. Extend `treefmt.nix` with formatters already used by the project — consult the treefmt-nix repo for available programs; don't introduce new formatters uninvited beyond the nix-base set.
 4. Fill in the `Justfile`: set the binary name in `run`, wire `test` to the project's test runner (splitting into `test-unit`/`test-integration` if the suite distinguishes them, with `test` running both), and adapt recipe bodies to the ecosystem's native commands where that's the better dev loop (e.g. `cargo build`) — but keep the recipe names stable.
 5. If the package is a daemon/service, offer an accompanying NixOS or nix-darwin module (pattern in [ECOSYSTEMS.md](ECOSYSTEMS.md)).
 6. Verify: `just build`, `just check`, `just test`, and `nix-shell --run '<toolchain> --version'`.
@@ -59,10 +59,12 @@ Every flake repo (scenarios 1b, 2, 3) gets Lint, Test, and Build workflows from 
 1. Find the host from `git remote get-url origin`: `forge.channings.me` → Forgejo, `github.com` → GitHub. No remote, or another host → ask.
 2. Forgejo repo → ask whether it's mirrored to GitHub. If so, add both sets: Forgejo ignores `.github/workflows` when `.forgejo/workflows` exists, so nothing runs twice on the forge.
 3. Copy `ci/forgejo/*.yaml` → `.forgejo/workflows/`, `ci/github/*.yaml` → `.github/workflows/`.
+4. Forgejo workflows → copy `ci/actionlint.yaml` → `.github/actionlint.yaml`: actionlint also lints `.forgejo/workflows/` and rejects the Forgejo runner labels otherwise. GitHub-only repo → delete the `forgejo-schema` formatter from `treefmt.nix`.
 
 The workflows run on pushes to `main` and on PRs:
 
-- **Lint** and **Test** run `just check` and `just test` in `nix-shell`, so the Justfile stays the single definition.
+- **Lint** and **Test** run `just check` and `just test` in `nix-shell`, so the Justfile stays the single definition. `just check` lints the workflows themselves too (actionlint, yamllint, and `forgejo-runner validate` via the `forgejo-schema` formatter), so keep edits to them yamllint-clean.
+- Test suites that need host-only tooling (e.g. a macOS-only CLI) must skip — exit 0 with a message — when it's missing, so `just test` passes on the runners.
 - **Build** `nix-build`s every `packages.<system>` and pushes the closures to `nix.channings.me` with nixham's [`niks3-push`](https://forge.channings.me/hartlandia/nixham/src/branch/main/.forgejo/actions/niks3-push) action (secret `NIKS3_CI_TOKEN`; fork PRs are skipped). Drop `build.yaml` if the flake has no packages. Pick `runs-on` to match the packages' system: Forgejo `nixos-latest` (`-x86_64`/`-arm64` to pin the arch, `macos-arm64` for darwin), GitHub `ubuntu-latest` / `ubuntu-24.04-arm` / `macos-latest`.
 - **Publish** (a job in `build.yaml`) pushes OCI images to a registry on `main` only, tagged with the commit SHA and `latest`: Forgejo → `forge.channings.me/<owner>/<name>` (secret `FORGE_PAT`), GitHub → `ghcr.io/<owner>/<name>`. Their closures already reached `nix.channings.me` in Build, with everything else. If no package builds a container image, delete the job. Otherwise:
   - Add one matrix entry per image: `name` (registry image name), `attr` (`nix-build -A` attribute), `transport` (`oci-archive` for OCI archive tarballs, `docker-archive` for `dockerTools` images).
@@ -76,4 +78,4 @@ Vanilla commands only — see the core convention above.
 - [ ] `just check` passes and `just build` builds (if packages exist)
 - [ ] `direnv allow` succeeds and loads the shell
 - [ ] nix files are git-tracked (if repo)
-- [ ] `actionlint .github/workflows/*.yaml` passes (if GitHub workflows exist)
+- [ ] `just check` lints the workflows (actionlint, yamllint, forgejo-schema) — no separate linter runs needed
