@@ -2,9 +2,9 @@ load helpers
 
 setup_file() {
   export CONTAINER=lbi-norosetta
-  REF="$(build_and_load norosetta "$(keyed_expr)")"
+  REF="$(build_and_load norosetta pkg)"
   export REF
-  boot_container "$REF"
+  boot_keyed "$REF"
 }
 
 teardown_file() {

@@ -2,7 +2,7 @@ load helpers
 
 setup_file() {
   export CONTAINER=lbi-bench
-  REF="$(build_and_load bench "$(keyed_expr)")"
+  REF="$(build_and_load bench pkg)"
   export REF
 }
 
@@ -15,7 +15,7 @@ teardown_file() {
 boot_to_ready() {
   local t0
   t0="$(now)"
-  boot_container "$REF" --rosetta
+  boot_keyed "$REF" --rosetta
   until r 'nix-store --store daemon -q --hash /run/current-system' >/dev/null 2>&1; do
     awk -v t="$(elapsed "$t0")" 'BEGIN { exit !(t > 30) }' && fail "nix-daemon never answered"
     sleep 0.01

@@ -3,9 +3,9 @@ load helpers
 # Its own container: other tests' sessions would count against MaxStartups.
 setup_file() {
   export CONTAINER=lbi-herd
-  REF="$(build_and_load herd "$(keyed_expr)")"
+  REF="$(build_and_load herd pkg)"
   export REF
-  boot_container "$REF" --rosetta
+  boot_keyed "$REF" --rosetta
 }
 
 teardown_file() {

@@ -1,7 +1,7 @@
 load helpers
 
 setup_file() {
-  REF="$(build_and_load runtime-nix "$(keyed_expr)")"
+  REF="$(build_and_load runtime-nix pkg)"
   export REF CONTAINER=lbi-runtime-nix
   write_config "$BATS_FILE_TMPDIR"
   boot_configured "$BATS_FILE_TMPDIR"
@@ -20,12 +20,13 @@ own_container() {
   CONTAINER="lbi-runtime-nix-$BATS_TEST_NUMBER"
 }
 
-# write_config <dir> [substituter]: <dir>/config/nix.conf, which includes
-# <dir>/secrets/nested.conf from its /secrets mount, and <dir>/builder.env,
-# whose NIX_CONFIG_A includes <dir>/secrets/env.conf. Two includes are absent:
-# NIX_CONFIG_C's, and nested.conf's, relative to /secrets.
+# write_config <dir> [substituter]: authorize, then <dir>/config/nix.conf,
+# which includes <dir>/secrets/nested.conf from its /secrets mount, and
+# <dir>/builder.env, whose NIX_CONFIG_A includes <dir>/secrets/env.conf. Two
+# includes are absent: NIX_CONFIG_C's, and nested.conf's, relative to /secrets.
 write_config() {
-  mkdir -p "$1/config" "$1/secrets"
+  authorize "$1"
+  mkdir -p "$1/secrets"
   cat >"$1/config/nix.conf" <<CONF
 extra-substituters = ${2:-https://lbi-config.invalid}
 extra-sandbox-paths = /lbi-probe=/etc/resolv.conf

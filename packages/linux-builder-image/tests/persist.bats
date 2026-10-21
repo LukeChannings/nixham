@@ -3,8 +3,8 @@ load helpers
 setup_file() {
   # Image B differs from A only by an /etc file: a different system, so a
   # different store-path closure under the same volume.
-  REF_A="$(build_and_load a "$(keyed_expr)")"
-  REF_B="$(build_and_load b "pkg.override { modules = [ $(key_module) { environment.etc.lbi-persist-b.text = \"b\"; } ]; }")"
+  REF_A="$(build_and_load a pkg)"
+  REF_B="$(build_and_load b "pkg.override { modules = [ { environment.etc.lbi-persist-b.text = \"b\"; } ]; }")"
   export REF_A REF_B
   [ "$REF_A" != "$REF_B" ]
 }
@@ -27,7 +27,7 @@ teardown() {
 # Boot $1 against the store volume, the way the module does it: a fresh
 # container (rm + run) every time, the volume is the only state carried over.
 boot() {
-  boot_container "$1" --rosetta -v "$VOLUME:/persist"
+  boot_keyed "$1" --rosetta -v "$VOLUME:/persist"
   r true
   assert_no_failed_units
 }

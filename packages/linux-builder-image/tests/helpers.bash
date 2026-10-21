@@ -18,20 +18,6 @@ with_pkg() {
   echo "let pkg = (builtins.getFlake (toString $LBI_REPO)).packages.\${builtins.currentSystem}.linux-builder-image; in $1"
 }
 
-# key_module [user...]: authorizes the suite's key for the users (builder).
-key_module() {
-  local user
-  echo "{"
-  for user in "${@:-builder}"; do
-    echo "users.users.$user.openssh.authorizedKeys.keys = [ (builtins.readFile $BATS_SUITE_TMPDIR/key.pub) ];"
-  done
-  echo "}"
-}
-
-keyed_expr() {
-  echo "pkg.override { modules = [ $(key_module) ]; }"
-}
-
 # build_and_load <label> <expr>: loads the image into the runtime, prints its
 # ref. Files share images, so teardown_suite removes them. One load at a time:
 # under --jobs, concurrent loads lose images. --fallback: a failing substituter
@@ -113,6 +99,19 @@ boot_mounted() {
     [ ! -d "$dir/$d" ] || mounts+=(--mount "type=bind,source=$dir/$d,target=/$d,readonly")
   done
   boot_container "$ref" "${mounts[@]}" "$@"
+}
+
+# boot_keyed <ref> [container run flags...]: boot_mounted, with a /config
+# that authorizes the suite's key for builder.
+boot_keyed() {
+  boot_mounted "$1" "$BATS_SUITE_TMPDIR/keyed" "${@:2}"
+}
+
+# authorize <dir> [user] [key]: <dir>/config/ssh/authorized_keys.d/<user>
+# (builder) authorizes only <key> (the suite's).
+authorize() {
+  mkdir -p "$1/config/ssh/authorized_keys.d"
+  cat "${3:-$SSH_KEY}.pub" >"$1/config/ssh/authorized_keys.d/${2:-builder}"
 }
 
 # The container logs of $CONTAINER.

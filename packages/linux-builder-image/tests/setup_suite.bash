@@ -8,8 +8,10 @@ setup_suite() {
     "(builtins.getFlake (toString $LBI_REPO)).packages.\${builtins.currentSystem}.apple-container-kernel")/vmlinux-arm64"
   export LBI_REPO LBI_KERNEL
 
-  # One key for every file, so the keyed image is built once per run.
+  # One key for every file, and boot_keyed's /config authorizing it.
   ssh-keygen -q -t ed25519 -N '' -C lbi-probe -f "$BATS_SUITE_TMPDIR/key"
+  mkdir -p "$BATS_SUITE_TMPDIR/keyed/config/ssh/authorized_keys.d"
+  cp "$BATS_SUITE_TMPDIR/key.pub" "$BATS_SUITE_TMPDIR/keyed/config/ssh/authorized_keys.d/builder"
 }
 
 teardown_suite() {

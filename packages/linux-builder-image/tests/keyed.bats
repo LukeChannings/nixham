@@ -2,7 +2,11 @@ load helpers
 
 setup_file() {
   export CONTAINER=lbi-keyed
-  REF="$(build_and_load keyed "pkg.override { modules = [ $(key_module builder root) ]; }")"
+  local key="(builtins.readFile $SSH_KEY.pub)"
+  REF="$(build_and_load keyed "pkg.override { modules = [ {
+    users.users.builder.openssh.authorizedKeys.keys = [ $key ];
+    users.users.root.openssh.authorizedKeys.keys = [ $key ];
+  } ]; }")"
   export REF
   boot_container "$REF" --rosetta
 }

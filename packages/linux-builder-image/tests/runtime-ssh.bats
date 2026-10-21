@@ -3,8 +3,8 @@ load helpers
 setup_file() {
   REF="$(build_and_load bare pkg)"
   export REF CONTAINER=lbi-runtime-ssh
-  authorize "$BATS_FILE_TMPDIR" builder "$SSH_KEY"
-  authorize "$BATS_FILE_TMPDIR" root "$SSH_KEY"
+  authorize "$BATS_FILE_TMPDIR"
+  authorize "$BATS_FILE_TMPDIR" root
   ssh-keygen -q -t ed25519 -N '' -C lbi-user-ca -f "$BATS_FILE_TMPDIR/user-ca"
   trust_user_ca "$BATS_FILE_TMPDIR"
   mount_host_key "$BATS_FILE_TMPDIR"
@@ -25,13 +25,6 @@ teardown() {
 
 own_container() {
   CONTAINER="lbi-runtime-ssh-$BATS_TEST_NUMBER"
-}
-
-# authorize <dir> <user> <key>: <dir>/config/ssh/authorized_keys.d/<user>
-# authorizes only <key>.
-authorize() {
-  mkdir -p "$1/config/ssh/authorized_keys.d"
-  cat "$3.pub" >"$1/config/ssh/authorized_keys.d/$2"
 }
 
 # trust_user_ca <dir>: <dir>/config/ssh/trusted_user_ca_keys holds the file's
@@ -99,7 +92,7 @@ new_cert() {
 
 @test "replacing the key file on the host while running changes nothing" {
   own_container
-  authorize "$BATS_TEST_TMPDIR" builder "$SSH_KEY"
+  authorize "$BATS_TEST_TMPDIR"
   boot_mounted "$REF" "$BATS_TEST_TMPDIR" --rosetta
   key="$(new_key replacement)"
   authorize "$BATS_TEST_TMPDIR" builder "$key"
@@ -110,7 +103,7 @@ new_cert() {
 
 @test "a new container takes the replaced key file, and refuses the old key" {
   own_container
-  authorize "$BATS_TEST_TMPDIR" builder "$SSH_KEY"
+  authorize "$BATS_TEST_TMPDIR"
   boot_mounted "$REF" "$BATS_TEST_TMPDIR" --rosetta
   key="$(new_key replacement)"
   authorize "$BATS_TEST_TMPDIR" builder "$key"
@@ -150,7 +143,7 @@ new_cert() {
 @test "with a store volume, the persisted host key outlives a mounted one, which never reaches the volume" {
   own_container
   container volume create "$CONTAINER" >/dev/null
-  authorize "$BATS_TEST_TMPDIR" builder "$SSH_KEY"
+  authorize "$BATS_TEST_TMPDIR"
   boot_mounted "$REF" "$BATS_TEST_TMPDIR" --rosetta -v "$CONTAINER:/persist"
   persisted="$(host_key)"
   assert [ -n "$persisted" ]
@@ -175,7 +168,7 @@ new_cert() {
 
 @test "a host certificate without its host key is ignored, with a warning" {
   own_container
-  authorize "$BATS_TEST_TMPDIR" builder "$SSH_KEY"
+  authorize "$BATS_TEST_TMPDIR"
   cp "$BATS_FILE_TMPDIR/config/ssh/ssh_host_ed25519_key-cert.pub" "$BATS_TEST_TMPDIR/config/ssh/"
   boot_mounted "$REF" "$BATS_TEST_TMPDIR" --rosetta
   run logs
