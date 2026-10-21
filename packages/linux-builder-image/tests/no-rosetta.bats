@@ -12,7 +12,7 @@ teardown_file() {
   [ -z "${REF:-}" ] || container image rm "$REF" >/dev/null 2>&1 || true
 }
 
-@test "root still logs in with the key" {
+@test "builder still logs in with the key" {
   run r true
   assert_success
 }

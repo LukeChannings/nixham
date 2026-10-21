@@ -17,24 +17,18 @@ x86() {
 }
 
 @test "root logs in with the key provided via modules" {
-  run r true
+  SSH_USER=root run r true
   assert_success
 }
 
 @test "builder logs in with the key provided via modules" {
-  SSH_USER=builder run r whoami
+  run r whoami
   assert_output builder
 }
 
 @test "builder is a trusted Nix user" {
-  SSH_USER=builder run r 'nix store info --store daemon'
+  run r 'nix store info --store daemon'
   assert_line --regexp '^Trusted: 1$'
-}
-
-@test "the host builds on the builder over ssh-ng as builder" {
-  out="$(SSH_USER=builder remote_build "$(probe_expr builder)")"
-  run x "cat $out"
-  assert_output ok
 }
 
 @test "systemd is PID 1" {
@@ -144,7 +138,7 @@ x86() {
   local i
   for i in $(seq 20); do "$NC" -z -G 2 "$(current_ip)" 22 >/dev/null 2>&1 || true; done
   for i in $(seq 100); do
-    ("$SSH" "${SSHO[@]}" root@"$(current_ip)" 'sleep 2; echo ok' >"$BATS_TEST_TMPDIR/$i" 2>&1 || true) 3>&- &
+    ("$SSH" "${SSHO[@]}" "$SSH_USER@$(current_ip)" 'sleep 2; echo ok' >"$BATS_TEST_TMPDIR/$i" 2>&1 || true) 3>&- &
   done
   wait
   run grep -lx ok "$BATS_TEST_TMPDIR"/*

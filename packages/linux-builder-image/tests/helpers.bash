@@ -6,7 +6,7 @@ NC=/usr/bin/nc
 PERL=/usr/bin/perl
 
 # Who r, remote_build and the herd log in as.
-SSH_USER=root
+SSH_USER=builder
 
 SSHO=(-i "$BATS_SUITE_TMPDIR/key" -o IdentitiesOnly=yes -o IdentityAgent=none
   -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR

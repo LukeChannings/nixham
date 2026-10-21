@@ -112,7 +112,7 @@ probe() {
   assert_clean_previous_shutdown
 
   run env PATH="/usr/bin:$PATH" NIX_SSHOPTS="${SSHO[*]}" \
-    nix copy --no-check-sigs --from "ssh-ng://root@$(current_ip)" "$out2"
+    nix copy --no-check-sigs --from "ssh-ng://$SSH_USER@$(current_ip)" "$out2"
   echo "$out2" >>"$BATS_FILE_TMPDIR/imported"
   assert_success
   refute_output --partial 'hash mismatch'
