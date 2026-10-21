@@ -9,7 +9,8 @@
 let
   inherit (lib) mkDefault mkForce;
 
-  # What `container run` passed in, read once at boot: /config, copied here.
+  # What `container run` passed in, read once at boot: /config, copied here,
+  # and NIX_CONFIG plus NIX_CONFIG_* (systemd passes no environment on).
   # Root-only and in RAM, so private keys and tokens never reach a disk.
   snapshot = "/run/linux-builder";
 
@@ -19,6 +20,7 @@ let
 
     log() { echo "linux-builder: $*" >&2; }
 
+    umask 077
     rm -rf ${snapshot}
     # Traversable, not listable: builder's own nix stats the root-only
     # includes (and skips them), sshd reads authorized_keys.d as the user.
@@ -26,13 +28,21 @@ let
     if [ -d /config ]; then
       cp -RL /config ${snapshot}/config || log "WARN could not copy all of /config"
       chown -R 0:0 ${snapshot}/config
-      chmod -R u=rwX,go= ${snapshot}/config
       chmod 0711 ${snapshot}/config
       if [ -d ${snapshot}/config/ssh/authorized_keys.d ]; then
         chmod 0711 ${snapshot}/config/ssh
         chmod -R go+rX ${snapshot}/config/ssh/authorized_keys.d
       fi
     fi
+
+    applied=()
+    {
+      [ -z "''${NIX_CONFIG:-}" ] || { printf '%s\n' "$NIX_CONFIG"; applied+=(NIX_CONFIG); }
+      for v in $(printf '%s\n' "''${!NIX_CONFIG_@}" | LC_ALL=C sort); do
+        [ -z "''${!v}" ] || { printf '%s\n' "''${!v}"; applied+=("$v"); }
+      done
+    } >${snapshot}/environment.conf
+    [ ''${#applied[@]} -eq 0 ] || log "applied Nix config from ''${applied[*]}"
   '';
 in
 {
@@ -172,6 +182,7 @@ in
 
   nix.extraOptions = ''
     !include ${snapshot}/config/nix.conf
+    !include ${snapshot}/environment.conf
   '';
 
   nix.settings = {

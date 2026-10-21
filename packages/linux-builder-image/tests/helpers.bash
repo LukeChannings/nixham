@@ -74,10 +74,11 @@ current_ip() {
   cat "$BATS_RUN_TMPDIR/$CONTAINER.ip"
 }
 
-# Runs a command in $CONTAINER as root, through the runtime: no ssh.
+# Runs a command in $CONTAINER as root, through the runtime: no ssh. In a
+# clean environment, as systemd's services: exec passes on `container run -e`.
 x() {
-  container exec -e PATH=/run/wrappers/bin:/run/current-system/sw/bin \
-    "$CONTAINER" /run/current-system/sw/bin/bash -c "$*"
+  container exec "$CONTAINER" /run/current-system/sw/bin/env -i HOME=/root \
+    PATH=/run/wrappers/bin:/run/current-system/sw/bin /run/current-system/sw/bin/bash -c "$*"
 }
 
 # Runs a command in $CONTAINER over ssh as $SSH_USER. /usr/bin/ssh:

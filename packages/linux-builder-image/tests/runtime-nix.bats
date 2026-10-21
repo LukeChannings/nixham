@@ -4,7 +4,7 @@ setup_file() {
   REF="$(build_and_load runtime-nix "$(keyed_expr)")"
   export REF CONTAINER=lbi-runtime-nix
   write_config "$BATS_FILE_TMPDIR"
-  boot_mounted "$REF" "$BATS_FILE_TMPDIR" --rosetta
+  boot_configured "$BATS_FILE_TMPDIR"
 }
 
 teardown_file() {
@@ -21,15 +21,32 @@ own_container() {
 }
 
 # write_config <dir> [substituter]: <dir>/config/nix.conf, which includes
-# <dir>/secrets/nested.conf from its /secrets mount.
+# <dir>/secrets/nested.conf from its /secrets mount, and <dir>/builder.env,
+# whose NIX_CONFIG_A includes <dir>/secrets/env.conf.
 write_config() {
   mkdir -p "$1/config" "$1/secrets"
   cat >"$1/config/nix.conf" <<CONF
 extra-substituters = ${2:-https://lbi-config.invalid}
 extra-sandbox-paths = /lbi-probe=/etc/resolv.conf
+narinfo-cache-positive-ttl = 1111
 !include /secrets/nested.conf
 CONF
   echo 'narinfo-cache-negative-ttl = 4242' >"$1/secrets/nested.conf"
+  cat >"$1/builder.env" <<ENV
+NIX_CONFIG_B=http-connections = 37
+NIX_CONFIG_A=!include /secrets/env.conf
+ENV
+  echo 'download-attempts = 7' >"$1/secrets/env.conf"
+}
+
+# NIX_CONFIG's two lines; the second overrides /config's nix.conf.
+NIX_CONFIG_LINES="connect-timeout = 17
+narinfo-cache-positive-ttl = 2222"
+
+# boot_configured <dir>: $CONTAINER with all of <dir>'s write_config, as
+# mounts and environment.
+boot_configured() {
+  boot_mounted "$REF" "$1" --rosetta -e "NIX_CONFIG=$NIX_CONFIG_LINES" --env-file "$1/builder.env"
 }
 
 nix_config() {
@@ -48,11 +65,32 @@ nix_config() {
   assert_output "$(x 'head -1 /etc/resolv.conf')"
 }
 
+@test "NIX_CONFIG's lines and each NIX_CONFIG_*, includes and all, are in effect" {
+  run nix_config
+  assert_line 'connect-timeout = 17'
+  assert_line 'http-connections = 37'
+  assert_line 'download-attempts = 7'
+}
+
+@test "the environment wins over /config's nix.conf" {
+  run nix_config
+  assert_line 'narinfo-cache-positive-ttl = 2222'
+}
+
+@test "the logs name the environment variables applied, never their values" {
+  run logs
+  assert_output --regexp 'linux-builder: .*NIX_CONFIG NIX_CONFIG_A NIX_CONFIG_B'
+  refute_output --partial 'connect-timeout'
+  refute_output --partial 'http-connections'
+  refute_output --partial '/secrets/env.conf'
+}
+
 @test "builder's own nix works, without reading the root-only config" {
   run r 'nix config show'
   assert_success
   refute_output --partial lbi-config.invalid
   refute_line 'narinfo-cache-negative-ttl = 4242'
+  refute_line 'connect-timeout = 17'
 }
 
 @test "the system is running with no failed units" {
@@ -80,13 +118,17 @@ nix_config() {
   refute_output --partial lbi-config.invalid
 }
 
-@test "a new container without the mounts keeps none of their settings" {
+@test "a new container without the mounts or the environment keeps none of their settings" {
   own_container
   write_config "$BATS_TEST_TMPDIR"
-  boot_mounted "$REF" "$BATS_TEST_TMPDIR" --rosetta
+  boot_configured "$BATS_TEST_TMPDIR"
   boot_container "$REF" --rosetta
   run nix_config
   refute_output --partial lbi-config.invalid
   refute_output --partial lbi-probe
   refute_line 'narinfo-cache-negative-ttl = 4242'
+  refute_line 'narinfo-cache-positive-ttl = 1111'
+  refute_line 'connect-timeout = 17'
+  refute_line 'http-connections = 37'
+  refute_line 'download-attempts = 7'
 }
