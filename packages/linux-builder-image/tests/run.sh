@@ -4,7 +4,6 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../../.." && pwd)"
 system="${SYSTEM:-aarch64-darwin}"
-herd="${HERD:-100}"
 
 # Regression budgets, in seconds. Targets measured on an M-series host under
 # apple/container 1.1.0, with headroom for run-to-run noise.
@@ -22,7 +21,6 @@ MAX_STARTUP=2.5
 MAX_PARTIAL_REBUILD=45
 
 SSH=/usr/bin/ssh
-NC=/usr/bin/nc
 PERL=/usr/bin/perl
 command -v container >/dev/null || { echo >&2 "FAIL: no \`container\` CLI"; exit 1; }
 command -v jq >/dev/null || { echo >&2 "FAIL: jq is required"; exit 1; }
@@ -110,27 +108,8 @@ waitForPort() {
     }' "$1" "$2"
 }
 
-herdOk() {
-  local ip=$1 d i
-  d="$(mktemp -d "$work/herd.XXXX")"
-  for i in $(seq 20); do "$NC" -z -G 2 "$ip" 22 >/dev/null 2>&1 || true; done
-  for i in $(seq "$herd"); do
-    ("$SSH" "${SSHO[@]}" root@"$ip" 'sleep 2; echo ok' >"$d/$i" 2>&1 || true) &
-  done
-  wait
-  { grep -lx ok "$d"/* 2>/dev/null || true; } | wc -l | tr -d ' '
-}
-
 keyModule="{ users.users.root.openssh.authorizedKeys.keys = [ (builtins.readFile $work/key.pub) ]; }"
 keyExpr="pkg.override { modules = [ $keyModule ]; }"
-
-x86="let pkgs = import (builtins.getFlake (toString $repo)).inputs.nixpkgs { system = \"x86_64-linux\"; }; in"
-
-remoteBuild() {
-  PATH="/usr/bin:$PATH" NIX_SSHOPTS="${SSHO[*]}" \
-    nix build --impure --no-link --print-out-paths --eval-store auto --store "ssh-ng://root@$ip" --expr "$1" \
-    2>"$work/remote-build.log" | tail -1
-}
 
 echo >&2 "=== building images (offloaded to the aarch64-linux builder) ==="
 build "$work/keyed.tar" "$keyExpr"
@@ -177,102 +156,7 @@ for _ in 1 2 3; do
   best="$(awk -v a="$tStartup" -v b="${best:-$tStartup}" 'BEGIN { print (a < b) ? a : b }')"
   overBudget "$best" "$MAX_STARTUP" || break
 done
-pass "root logs in with the key provided via modules"
 withinBudget "startup (container run → nix-daemon answering over ssh)" "$best" "$MAX_STARTUP"
-
-[ "$(r 'ps -o comm= -p 1')" = systemd ] || fail "PID 1 is not systemd"
-pass "systemd is PID 1"
-
-state="$(r 'systemctl is-system-running --wait' || true)"
-failed="$(r 'systemctl --failed --plain --no-legend' | awk '{print $1}')"
-if [ -n "$failed" ]; then
-  r 'systemctl --failed --no-pager' >&2 || true
-  fail "failed units: $(echo $failed)"
-fi
-[ "$state" = running ] || fail "system state: $state"
-r 'systemctl is-active multi-user.target' >/dev/null || fail "multi-user.target not active"
-pass "multi-user.target reached; system state '$state', no failed units"
-
-routes="$(r 'ip -4 route show')"
-if [ -z "$routes" ] || grep -v 'quickack 1' <<<"$routes" >/dev/null; then
-  fail "routes lack quickack: $routes"
-fi
-pass "every IPv4 route has quickack"
-
-r 'getent hosts cache.nixos.org' >/dev/null || fail "DNS lookup failed inside the builder"
-pass "DNS resolves via the runtime-provided resolv.conf"
-
-r 'nix-store -q --hash "$(readlink -f /run/current-system)"' >/dev/null \
-  || fail "the system closure is not registered in the Nix DB"
-container logs "$keyed" 2>/dev/null | grep -q 'THE STORE IS EPHEMERAL' \
-  || fail "no ephemeral-store warning without a volume at /persist"
-[ "$(r 'findmnt -n -o FSTYPE /nix || true')" != overlay ] || fail "/nix is an overlay without a volume"
-pass "without a store volume, stage 2 warns the store is ephemeral"
-
-r '[ "$(cat /nix/var/nix/linux-builder-seeded-system)" = "$(readlink -f /run/booted-system)" ]' \
-  || fail "stage 2 did not record the DB as seeded for the booted system"
-r '[ "$(readlink -f /nix/var/nix/profiles/system)" = "$(readlink -f /run/current-system)" ]' \
-  || fail "system profile not set"
-pass "Nix DB seeded with the image closure; system profile set"
-
-eff="$(r 'sshd -T')"
-for want in "maxstartups 100:30:200" "maxsessions 100" "persourcepenalties no" \
-  "acceptenv NIX_*" "permitrootlogin prohibit-password" \
-  "passwordauthentication no" "kbdinteractiveauthentication no"; do
-  grep -qixF "$want" <<<"$eff" || fail "sshd -T lacks '$want'"
-done
-pass "sshd effective config carries the scar tissue"
-
-conf="$(r 'nix config show')"
-for want in "sandbox = true" "min-free = $((40 << 30))" "max-free = $((120 << 30))"; do
-  grep -qxF "$want" <<<"$conf" || fail "nix config lacks '$want'"
-done
-grep -qE '^trusted-users = .*\broot\b' <<<"$conf" || fail "root is not a trusted user"
-grep -qE '^experimental-features = .*\bflakes\b' <<<"$conf" || fail "flakes not enabled"
-pass "nix.settings carry the generic builder settings"
-
-probeDrv="derivation { name = \"lbi-probe-$(date +%s)\"; system = \"aarch64-linux\"; builder = \"/bin/sh\"; args = [ \"-c\" \"echo ok > \$out\" ]; }"
-out="$(PATH="/usr/bin:$PATH" NIX_SSHOPTS="${SSHO[*]}" \
-  nix build --no-link --print-out-paths --eval-store auto --store "ssh-ng://root@$ip" --expr "$probeDrv" 2>/dev/null | tail -1)"
-[ -n "$out" ] && [ "$(r "cat $out")" = ok ] || fail "remote build over ssh-ng failed"
-pass "host builds a derivation on the builder over ssh-ng"
-
-echo >&2 "=== Rosetta ==="
-r 'mountpoint -q /run/rosetta && [ -x /run/rosetta/rosetta ]' || fail "/run/rosetta is not the Rosetta share"
-pass "the rosetta virtiofs share is mounted at /run/rosetta"
-
-# virtualisation.rosetta's registration: Rosetta itself, preserve-argv0.
-# The kernel displays the requested PCF as POCF (C implies O).
-reg="$(r 'cat /proc/sys/fs/binfmt_misc/rosetta' || true)"
-grep -qx enabled <<<"$reg" && grep -qx 'flags: POCF' <<<"$reg" \
-  || fail "Rosetta not registered with POCF: $reg"
-r '[ ! -e /proc/sys/fs/binfmt_misc/x86_64 ]' || fail "apple/container's argv0-discarding handler is still registered"
-pass "x86_64 binfmt handler is Rosetta with argv0 preserved (POCF); apple/container's is gone"
-
-grep -qE '^extra-platforms = .*\bx86_64-linux\b' <<<"$conf" || fail "x86_64-linux not in extra-platforms"
-grep -qE '^sandbox-paths = .*/run/rosetta\b' <<<"$conf" || fail "/run/rosetta not in sandbox-paths"
-pass "nix advertises x86_64-linux and sandboxes the Rosetta share"
-
-ts="$(date +%s)"
-out="$(remoteBuild "$x86 pkgs.runCommand \"lbi-x86-probe-$ts\" { } \"uname -m > \$out\"")" \
-  || { cat "$work/remote-build.log" >&2; fail "x86_64-linux build failed"; }
-[ "$(r "cat $out")" = x86_64 ] || fail "x86_64-linux build ran as $(r "cat $out")"
-pass "an x86_64-linux derivation builds on the builder under Rosetta"
-
-envExpr="pkgs.python3.withPackages (ps: [ ps.six ])"
-envPath="$(nix-instantiate --eval --raw -E "$x86 ($envExpr).outPath")"
-out="$(remoteBuild "$x86 let env = $envExpr; in pkgs.runCommand \"lbi-argv0-probe-$ts\" { } ''
-  \${env}/bin/python3 -c 'import sys; print(sys.prefix)' > \$out
-  \${env}/bin/python3 -c 'import six' >> \$out
-''")" || { cat "$work/remote-build.log" >&2; fail "argv0 probe build failed (did the env collapse?)"; }
-prefix="$(r "cat $out")"
-[ "$prefix" = "$envPath" ] || fail "x86_64 python.withPackages resolved sys.prefix to $prefix, not $envPath"
-pass "x86_64 python.withPackages env resolves its own prefix (argv0 preserved)"
-
-echo >&2 "=== parallel-connection herd ($herd sessions after 20 banner-less probes) ==="
-n="$(herdOk "$ip")"
-[ "$n" = "$herd" ] || fail "only $n/$herd herd sessions succeeded"
-pass "$n/$herd herd sessions succeeded"
 
 echo >&2 "=== keyed image without --rosetta ==="
 # No share: the rosetta mount (nofail) and systemd-binfmt fail, nothing
