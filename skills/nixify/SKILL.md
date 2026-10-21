@@ -5,7 +5,7 @@ description: Set up or normalize Nix configuration in a directory — from a min
 
 # Nixify
 
-Templates are bundled under [`templates/`](templates/) (resolve relative to this skill directory): `nix-base/` for flake scenarios, `simple-shell/` for scenario 1a. `nix-base` is the source of truth for conventions. Read every template file before acting: `flake.nix`, `default.nix`, `shell.nix`, `.envrc`, `treefmt.nix`, `Justfile`, `.gitignore`, `.zed/tasks.json` (Title-case recipe tasks + the `create_worktree` hook).
+Templates are bundled under [`templates/`](templates/) (resolve relative to this skill directory): `nix-base/` for flake scenarios, `simple-shell/` for scenario 1a, `ci/` for [CI workflows](#ci-workflows). `nix-base` is the source of truth for conventions. Read every template file before acting: `flake.nix`, `default.nix`, `shell.nix`, `.envrc`, `treefmt.nix`, `Justfile`, `.gitignore`, `.zed/tasks.json` (Title-case recipe tasks + the `create_worktree` hook).
 
 **Config files are stored inert** so that git, direnv, and Zed don't treat the templates as live config in the repo hosting this skill: dotfiles carry a `dot-` prefix (`dot-envrc`, `dot-gitignore`; rename `dot-*` → `.*` on copy), and `zed-tasks.json` is flat (copy to `.zed/tasks.json`).
 
@@ -52,6 +52,22 @@ Start from Scenario 1b, then:
 
 Audit the repo's config against nix-base conventions and converge. Full checklist and hoisting recipes: [REFERENCE.md](REFERENCE.md). Never discard existing inputs, packages, or shell hooks — relocate them.
 
+## CI workflows
+
+Every flake repo (scenarios 1b, 2, 3) gets Lint, Test, and Build workflows from [`templates/ci/`](templates/ci/). Read them before acting.
+
+1. Find the host from `git remote get-url origin`: `forge.channings.me` → Forgejo, `github.com` → GitHub. No remote, or another host → ask.
+2. Forgejo repo → ask whether it's mirrored to GitHub. If so, add both sets: Forgejo ignores `.github/workflows` when `.forgejo/workflows` exists, so nothing runs twice on the forge.
+3. Copy `ci/forgejo/*.yaml` → `.forgejo/workflows/`, `ci/github/*.yaml` → `.github/workflows/`.
+
+The workflows run on pushes to `main` and on PRs:
+
+- **Lint** and **Test** run `just check` and `just test` in `nix-shell`, so the Justfile stays the single definition.
+- **Build** `nix-build`s every `packages.<system>` and pushes the closures to `nix.channings.me` with nixham's [`niks3-push`](https://forge.channings.me/hartlandia/nixham/src/branch/main/.forgejo/actions/niks3-push) action (secret `NIKS3_CI_TOKEN`; fork PRs are skipped). Drop `build.yaml` if the flake has no packages. Pick `runs-on` to match the packages' system: Forgejo `nixos-latest` (`-x86_64`/`-arm64` to pin the arch, `macos-arm64` for darwin), GitHub `ubuntu-latest` / `ubuntu-24.04-arm` / `macos-latest`.
+- **Publish** (a job in `build.yaml`) pushes OCI images to a registry on `main` only, tagged with the commit SHA and `latest`: Forgejo → `forge.channings.me/<owner>/<name>` (secret `FORGE_PAT`), GitHub → `ghcr.io/<owner>/<name>`. Their closures already reached `nix.channings.me` in Build, with everything else. If no package builds a container image, delete the job. Otherwise:
+  - Add one matrix entry per image: `name` (registry image name), `attr` (`nix-build -A` attribute), `transport` (`oci-archive` for OCI archive tarballs, `docker-archive` for `dockerTools` images).
+  - Add `skopeo` to `devShells.default`. For a nix2container image, use transport `nix` and nix2container's `skopeo-nix2container` instead.
+
 ## Verification (all scenarios)
 
 Vanilla commands only — see the core convention above.
@@ -60,3 +76,4 @@ Vanilla commands only — see the core convention above.
 - [ ] `just check` passes and `just build` builds (if packages exist)
 - [ ] `direnv allow` succeeds and loads the shell
 - [ ] nix files are git-tracked (if repo)
+- [ ] `actionlint .github/workflows/*.yaml` passes (if GitHub workflows exist)

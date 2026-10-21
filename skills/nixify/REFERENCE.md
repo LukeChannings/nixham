@@ -27,6 +27,7 @@ Goal: the repo ends up structurally identical to [`templates/nix-base/`](templat
 - [ ] `.gitignore` covers `result`, `result-*`, `.direnv/`, `.env`? Merge missing entries in.
 - [ ] `.zed/tasks.json` present, with Title-case core-recipe tasks and the `create_worktree` hook? Rename any `just <recipe>` labels (they collide with Zed's `just` extension tasks, showing every task twice) and drop entries for meta/parameterised recipes.
 - [ ] Has a `Justfile` with the standard recipe names? If the repo has ad-hoc scripts or a Makefile for check/build/run, mirror them as `just` recipes (keep the originals unless asked); ensure `just` is in the devShell.
+- [ ] CI workflows present and matching [`templates/ci/`](templates/ci/)? See the CI section of [SKILL.md](SKILL.md#ci-workflows). Keep jobs the repo already has; converge Lint/Test/Build onto the `just` recipes and the niks3 push.
 - [ ] Formatter wired up? If no treefmt, add `treefmt.nix` + the `formatter`/`checks.formatting` outputs. If the repo has its own formatter config (e.g. `.prettierrc`), enable the matching treefmt program rather than replacing config.
 - [ ] Per-system boilerplate hand-rolled? Prefer `flake-utils.lib.eachDefaultSystem` for plain package+devshell repos. If the repo exports NixOS/nix-darwin modules or configurations, flake-parts with its `modules` flake module is the convention instead — see the modules section of [ECOSYSTEMS.md](ECOSYSTEMS.md). If it already uses flake-parts consistently, keep it; don't downgrade to flake-utils.
 
