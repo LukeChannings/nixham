@@ -55,18 +55,11 @@ jobs:
           git clone --depth 1 -b "${HEAD_REF:-$REF_NAME}"
           "https://$TOKEN@forge.channings.me/$GITHUB_REPOSITORY.git" .
       - name: Push to forge.channings.me
-        env:
-          FORGE_PAT: ${{ secrets.FORGE_PAT }}
-          owner: ${{ github.repository_owner }}
-          name: ${{ matrix.name }}
+        # yamllint disable-line rule:line-length
+        uses: https://forge.channings.me/hartlandia/nixham/.forgejo/actions/oci-publish@main
+        with:
           attr: ${{ matrix.attr }}
           transport: ${{ matrix.transport }}
-        run: |
-          set -euo pipefail
-          skopeo=$(nix-shell --run 'command -v skopeo')
-          image=$(nix-build --no-out-link -A "$attr")
-          ref="forge.channings.me/${owner,,}/$name"
-          for tag in "$GITHUB_SHA" latest; do
-            "$skopeo" --insecure-policy copy --dest-creds "forgejo:$FORGE_PAT" \
-              "$transport:$image" "docker://$ref:$tag"
-          done
+          registry: forge.channings.me
+          name: ${{ matrix.name }}
+          creds: forgejo:${{ secrets.FORGE_PAT }}

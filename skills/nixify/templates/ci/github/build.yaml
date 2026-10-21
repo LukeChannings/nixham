@@ -62,18 +62,10 @@ jobs:
           determinate: false
       - uses: lukechannings/nixham/.forgejo/actions/substituter@main
       - name: Push to ghcr.io
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          name: ${{ matrix.name }}
+        uses: lukechannings/nixham/.forgejo/actions/oci-publish@main
+        with:
           attr: ${{ matrix.attr }}
           transport: ${{ matrix.transport }}
-        run: |
-          set -euo pipefail
-          skopeo=$(nix-shell --run 'command -v skopeo')
-          image=$(nix-build --no-out-link -A "$attr")
-          ref="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/$name"
-          for tag in "$GITHUB_SHA" latest; do
-            "$skopeo" --insecure-policy copy \
-              --dest-creds "$GITHUB_ACTOR:$GITHUB_TOKEN" \
-              "$transport:$image" "docker://$ref:$tag"
-          done
+          registry: ghcr.io
+          name: ${{ matrix.name }}
+          creds: ${{ github.actor }}:${{ github.token }}
