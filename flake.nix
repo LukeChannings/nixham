@@ -53,6 +53,11 @@
 
         devShells.default = pkgs.mkShell {
           packages = [
+            (pkgs.bats.withLibraries (p: [
+              p.bats-support
+              p.bats-assert
+            ]))
+            pkgs.jq
             pkgs.just
             treefmt.config.build.wrapper
           ];
