@@ -27,7 +27,7 @@ test:
 
 # Build all packages
 build:
-    nix-build -A skill-nixify
+    nix-build -A skill-nixify -A apple-container-kernel
 
 # Nothing in this repo is runnable
 run *ARGS:

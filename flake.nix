@@ -22,15 +22,27 @@
         pkgs = import nixpkgs { inherit system; };
 
         treefmt = treefmt-nix.lib.evalModule pkgs ./treefmt.nix;
-      in
-      {
+
         packages = {
+          apple-container-kernel = pkgs.callPackage ./packages/apple-container-kernel/package.nix {
+            inherit (pkgs) path;
+          };
           skill-nixify = pkgs.callPackage ./skills/nixify/package.nix { };
         };
+      in
+      {
+        inherit packages;
 
         formatter = treefmt.config.build.wrapper;
 
-        checks.formatting = treefmt.config.build.check self;
+        checks = {
+          formatting = treefmt.config.build.check self;
+        }
+        # The configfile derivation asserts CONFIG_KVM/CONFIG_EROFS_FS survive
+        # olddefconfig — a cheap regression check without building the kernel.
+        // pkgs.lib.optionalAttrs (system == "aarch64-linux") {
+          apple-container-kernel-config = packages.apple-container-kernel.configfile;
+        };
 
         devShells.default = pkgs.mkShell {
           packages = [
