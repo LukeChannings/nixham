@@ -1,0 +1,3 @@
+{
+  "ignore": ["skills/nixify/templates/ci/**"]
+}
