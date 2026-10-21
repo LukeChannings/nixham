@@ -182,6 +182,8 @@ in
     authorizedKeysFiles = [ "${snapshot}/config/ssh/authorized_keys.d/%u" ];
     settings = {
       PermitRootLogin = mkDefault "no";
+      # No AuthorizedPrincipalsFile: a certificate's principal is the user name.
+      TrustedUserCAKeys = "${snapshot}/config/ssh/trusted_user_ca_keys";
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
       AcceptEnv = [ "NIX_*" ];

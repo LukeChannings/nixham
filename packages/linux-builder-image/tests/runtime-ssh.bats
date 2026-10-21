@@ -5,6 +5,8 @@ setup_file() {
   export REF CONTAINER=lbi-runtime-ssh
   authorize "$BATS_FILE_TMPDIR" builder "$SSH_KEY"
   authorize "$BATS_FILE_TMPDIR" root "$SSH_KEY"
+  ssh-keygen -q -t ed25519 -N '' -C lbi-user-ca -f "$BATS_FILE_TMPDIR/user-ca"
+  trust_user_ca "$BATS_FILE_TMPDIR"
   boot_mounted "$REF" "$BATS_FILE_TMPDIR" --rosetta
 }
 
@@ -28,9 +30,24 @@ authorize() {
   cat "$3.pub" >"$1/config/ssh/authorized_keys.d/$2"
 }
 
+# trust_user_ca <dir>: <dir>/config/ssh/trusted_user_ca_keys holds the file's
+# user CA.
+trust_user_ca() {
+  mkdir -p "$1/config/ssh"
+  cat "$BATS_FILE_TMPDIR/user-ca.pub" >"$1/config/ssh/trusted_user_ca_keys"
+}
+
 # new_key <name>: a fresh key in the test's temp dir; prints its path.
 new_key() {
   ssh-keygen -q -t ed25519 -N '' -C "lbi-$1" -f "$BATS_TEST_TMPDIR/$1"
+  echo "$BATS_TEST_TMPDIR/$1"
+}
+
+# new_cert <name> <principal>: new_key, with a certificate from the file's
+# user CA for <principal> next to it, where ssh picks it up.
+new_cert() {
+  new_key "$1" >/dev/null
+  ssh-keygen -q -s "$BATS_FILE_TMPDIR/user-ca" -I "lbi-$1" -n "$2" "$BATS_TEST_TMPDIR/$1.pub"
   echo "$BATS_TEST_TMPDIR/$1"
 }
 
@@ -69,5 +86,26 @@ new_key() {
   boot_mounted "$REF" "$BATS_TEST_TMPDIR" --rosetta
   SSH_KEY="$key" r true
   run r true
+  assert_failure
+}
+
+@test "a certificate from a trusted user CA, for principal builder, logs in as builder" {
+  SSH_KEY="$(new_cert cert builder)" run r whoami
+  assert_output builder
+}
+
+@test "a certificate from a trusted user CA for another principal is refused" {
+  SSH_KEY="$(new_cert cert someone-else)" run r true
+  assert_failure
+}
+
+@test "a new container without the trusted user CA refuses its certificates" {
+  own_container
+  trust_user_ca "$BATS_TEST_TMPDIR"
+  boot_mounted "$REF" "$BATS_TEST_TMPDIR" --rosetta
+  key="$(new_cert cert builder)"
+  SSH_KEY="$key" r true
+  boot_container "$REF" --rosetta
+  SSH_KEY="$key" run r true
   assert_failure
 }
