@@ -1,7 +1,5 @@
 # Runs once per bats invocation, whichever files are selected.
 setup_suite() {
-  command -v container >/dev/null || { echo >&2 "no \`container\` CLI"; return 1; }
-
   LBI_REPO="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
   # This tree's kernel, whose CONFIG_EROFS_FS the image's /etc overlay needs.
   LBI_KERNEL="$(nix-build --fallback --no-out-link -E \
