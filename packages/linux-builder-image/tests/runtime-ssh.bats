@@ -8,6 +8,8 @@ setup_file() {
   ssh-keygen -q -t ed25519 -N '' -C lbi-user-ca -f "$BATS_FILE_TMPDIR/user-ca"
   trust_user_ca "$BATS_FILE_TMPDIR"
   mount_host_key "$BATS_FILE_TMPDIR"
+  ssh-keygen -q -t ed25519 -N '' -C lbi-host-ca -f "$BATS_FILE_TMPDIR/host-ca"
+  ssh-keygen -q -s "$BATS_FILE_TMPDIR/host-ca" -h -I lbi-host -n lbi-builder "$BATS_FILE_TMPDIR/config/ssh/ssh_host_ed25519_key.pub"
   boot_mounted "$REF" "$BATS_FILE_TMPDIR" --rosetta
 }
 
@@ -55,11 +57,14 @@ mounted_host_key() {
   awk '{ print $1, $2 }' "$1/config/ssh/ssh_host_ed25519_key.pub"
 }
 
-# strict_r <known_hosts line> <command...>: r, trusting only that line.
+# strict_r <known_hosts line> [-o option...] <command...>: r, trusting only
+# that line.
 strict_r() {
+  local opts=()
   echo "$1" >"$BATS_TEST_TMPDIR/known_hosts"
   shift
-  "$SSH" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$BATS_TEST_TMPDIR/known_hosts" \
+  while [ "${1:-}" = -o ]; do opts+=("$1" "$2") && shift 2; done
+  "$SSH" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$BATS_TEST_TMPDIR/known_hosts" "${opts[@]}" \
     "${SSHO[@]}" -i "$SSH_KEY" "$SSH_USER@$(current_ip)" "$@"
 }
 
@@ -161,4 +166,20 @@ new_cert() {
   assert_equal "$(host_key)" "$persisted"
   run x "find /persist -type f -exec sha256sum {} + | grep -F $digest; grep -rlF '${mounted#* }' /persist"
   refute_output
+}
+
+@test "with the mounted host key's certificate, a client trusting only its CA connects" {
+  run strict_r "@cert-authority * $(cat "$BATS_FILE_TMPDIR/host-ca.pub")" -o HostKeyAlias=lbi-builder whoami
+  assert_output builder
+}
+
+@test "a host certificate without its host key is ignored, with a warning" {
+  own_container
+  authorize "$BATS_TEST_TMPDIR" builder "$SSH_KEY"
+  cp "$BATS_FILE_TMPDIR/config/ssh/ssh_host_ed25519_key-cert.pub" "$BATS_TEST_TMPDIR/config/ssh/"
+  boot_mounted "$REF" "$BATS_TEST_TMPDIR" --rosetta
+  run logs
+  assert_output --regexp 'linux-builder: WARN .*ssh_host_ed25519_key-cert\.pub'
+  assert_equal "$(host_key)" "$(x 'cut -d" " -f1,2 /persist/ssh/ssh_host_ed25519_key.pub')"
+  r true
 }

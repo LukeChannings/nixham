@@ -59,8 +59,12 @@ let
 
     if [ -f ${snapshot}/config/ssh/ssh_host_ed25519_key ]; then
       ln -s config/ssh/ssh_host_ed25519_key ${hostKey}
+      [ ! -f ${snapshot}/config/ssh/ssh_host_ed25519_key-cert.pub ] \
+        || ln -s config/ssh/ssh_host_ed25519_key-cert.pub ${hostKey}-cert.pub
     else
       ln -s ${persistedHostKey} ${hostKey}
+      [ ! -f ${snapshot}/config/ssh/ssh_host_ed25519_key-cert.pub ] \
+        || log "WARN ignoring /config/ssh/ssh_host_ed25519_key-cert.pub: no /config/ssh/ssh_host_ed25519_key to go with it"
     fi
 
     applied=()
@@ -211,6 +215,7 @@ in
       PermitRootLogin = mkDefault "no";
       # No AuthorizedPrincipalsFile: a certificate's principal is the user name.
       TrustedUserCAKeys = "${snapshot}/config/ssh/trusted_user_ca_keys";
+      HostCertificate = "${hostKey}-cert.pub";
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
       AcceptEnv = [ "NIX_*" ];
