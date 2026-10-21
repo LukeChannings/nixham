@@ -1,0 +1,36 @@
+---
+name: niks3 push
+description: >-
+  Push store paths and their closures to the nix.channings.me binary cache
+  through niks3, which signs on ingest. Uses the niks3 on PATH, else the one in
+  nixham's nixpkgs.
+
+inputs:
+  token:
+    description: Kanidm API token of a niks3_ci group member
+    required: true
+  paths:
+    description: Whitespace-separated store paths to push
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Push to nix.channings.me
+      shell: bash
+      env:
+        NIKS3_CI_TOKEN: ${{ inputs.token }}
+        NIKS3_SERVER_URL: https://niks3.nix.channings.me
+        action_path: ${{ github.action_path }}
+        paths: ${{ inputs.paths }}
+      run: |
+        set -euo pipefail
+        : "${NIKS3_CI_TOKEN:?the niks3-push token input is empty}"
+        niks3=niks3
+        if ! command -v niks3 >/dev/null; then
+          niks3=$(nix-build --no-out-link "$action_path/niks3.nix")/bin/niks3
+        fi
+        # $BASH, not bash: niks3 execs the script's argv[0] directly, and bash
+        # isn't on PATH on every runner.
+        # shellcheck disable=SC2086
+        "$niks3" push --auth-token-script "$BASH $action_path/token.sh" $paths

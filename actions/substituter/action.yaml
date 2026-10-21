@@ -1,0 +1,22 @@
+---
+name: nix.channings.me substituter
+description: >-
+  Substitute from the nix.channings.me binary cache in later steps. Run it
+  after installing Nix. The runner user must be a trusted Nix user, as the
+  DeterminateSystems and Cachix installers make it.
+
+runs:
+  using: composite
+  steps:
+    - name: Add nix.channings.me to NIX_CONFIG
+      shell: bash
+      run: |
+        set -euo pipefail
+        key=garage:JZet/fsItH8cJ6SKLci1+BuMIQGDfZSa/8GxGpKcxss=
+        {
+          echo "NIX_CONFIG<<____EOF"
+          [ -z "${NIX_CONFIG:-}" ] || echo "$NIX_CONFIG"
+          echo "extra-substituters = https://nix.channings.me"
+          echo "extra-trusted-public-keys = $key"
+          echo "____EOF"
+        } >> "$GITHUB_ENV"

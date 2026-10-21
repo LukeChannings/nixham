@@ -9,6 +9,19 @@ Nixham (_/ˈnixəm/_) is a small hamlet containing Nix stuff that hasn't yet bee
   - `nix-darwin/` - `nix-darwin` modules. Available under `modules.nix-darwin`
 - `packages/` - Nix packages. Available under `packages.${platform}`
 - `profiles/` - compositions of modules and packages for my systems.
+- `actions/` - composite actions for GitHub and Forgejo
+  - `substituter/` - substitute from `nix.channings.me`
+  - `niks3-push/` - push store paths to `nix.channings.me` through niks3
+
+```yaml
+# GitHub
+- uses: lukechannings/nixham/actions/niks3-push@main
+  with:
+    token: ${{ secrets.NIKS3_CI_TOKEN }}
+    paths: ./result
+# Forgejo
+- uses: https://forge.channings.me/hartlandia/nixham/actions/substituter@main
+```
 
 ## History
 
