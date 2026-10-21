@@ -5,7 +5,7 @@
 set -euo pipefail
 
 ref=${ref,,}
-tag=$(nix-instantiate --eval -A "$attr.imageTag" | tr -d '"')
+tag=$(nix-instantiate --eval --read-write-mode -A "$attr.imageTag" | tr -d '"')
 
 # skopeo's default, /var/tmp, doesn't exist on the NixOS runners.
 tmp=$(mktemp -d)

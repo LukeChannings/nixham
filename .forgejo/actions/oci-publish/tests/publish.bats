@@ -6,8 +6,10 @@ setup() {
   mkdir -p "$registry" "$BATS_TEST_TMPDIR/bin"
   export registry
 
+  # Upstream Nix's read-only --eval can't import from a path it copied to the store.
   cat >"$BATS_TEST_TMPDIR/bin/nix-instantiate" <<'EOF'
 #!/usr/bin/env bash
+[[ " $* " == *" --read-write-mode "* ]] || { echo "error: path '/nix/store/source' is not valid" >&2; exit 1; }
 echo '"closure"'
 EOF
   cat >"$BATS_TEST_TMPDIR/bin/nix-build" <<'EOF'
