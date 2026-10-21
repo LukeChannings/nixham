@@ -20,6 +20,21 @@ let
 
     log() { echo "linux-builder: $*" >&2; }
 
+    # warn_missing_includes <file> <as> [depth]: recursively, resolving as Nix
+    # does; the depth bound keeps an include cycle from hanging the boot.
+    warn_missing_includes() {
+      local file=$1 as=$2 depth=''${3:-0} kw target
+      while read -r kw target _; do
+        [ "$kw" = include ] || [ "$kw" = '!include' ] || continue
+        [[ $target == /* ]] || target="$(dirname "$file")/$target"
+        if [ ! -e "$target" ]; then
+          log "WARN $as includes $target, which does not exist"
+        elif [ "$depth" -lt 8 ]; then
+          warn_missing_includes "$target" "$target" $((depth + 1))
+        fi
+      done <"$file"
+    }
+
     umask 077
     rm -rf ${snapshot}
     # Traversable, not listable: builder's own nix stats the root-only
@@ -43,6 +58,9 @@ let
       done
     } >${snapshot}/environment.conf
     [ ''${#applied[@]} -eq 0 ] || log "applied Nix config from ''${applied[*]}"
+
+    [ ! -f ${snapshot}/config/nix.conf ] || warn_missing_includes ${snapshot}/config/nix.conf /config/nix.conf
+    warn_missing_includes ${snapshot}/environment.conf "the environment"
   '';
 in
 {

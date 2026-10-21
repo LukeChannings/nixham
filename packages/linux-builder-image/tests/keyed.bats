@@ -60,6 +60,13 @@ x86() {
   refute_output overlay
 }
 
+@test "a plain boot warns about nothing but the ephemeral store" {
+  run logs
+  assert_success
+  run grep -v 'THE STORE IS EPHEMERAL' <<<"$output"
+  refute_output --partial 'linux-builder: WARN'
+}
+
 @test "the Nix DB is seeded with the image closure and the system profile is set" {
   run x 'nix-store -q --hash "$(readlink -f /run/current-system)"'
   assert_success

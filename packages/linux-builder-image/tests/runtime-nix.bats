@@ -22,7 +22,8 @@ own_container() {
 
 # write_config <dir> [substituter]: <dir>/config/nix.conf, which includes
 # <dir>/secrets/nested.conf from its /secrets mount, and <dir>/builder.env,
-# whose NIX_CONFIG_A includes <dir>/secrets/env.conf.
+# whose NIX_CONFIG_A includes <dir>/secrets/env.conf. Two includes are absent:
+# NIX_CONFIG_C's, and nested.conf's, relative to /secrets.
 write_config() {
   mkdir -p "$1/config" "$1/secrets"
   cat >"$1/config/nix.conf" <<CONF
@@ -31,10 +32,11 @@ extra-sandbox-paths = /lbi-probe=/etc/resolv.conf
 narinfo-cache-positive-ttl = 1111
 !include /secrets/nested.conf
 CONF
-  echo 'narinfo-cache-negative-ttl = 4242' >"$1/secrets/nested.conf"
+  printf '%s\n' 'narinfo-cache-negative-ttl = 4242' '!include absent-nested.conf' >"$1/secrets/nested.conf"
   cat >"$1/builder.env" <<ENV
 NIX_CONFIG_B=http-connections = 37
 NIX_CONFIG_A=!include /secrets/env.conf
+NIX_CONFIG_C=!include /secrets/absent.conf
 ENV
   echo 'download-attempts = 7' >"$1/secrets/env.conf"
 }
@@ -79,10 +81,16 @@ nix_config() {
 
 @test "the logs name the environment variables applied, never their values" {
   run logs
-  assert_output --regexp 'linux-builder: .*NIX_CONFIG NIX_CONFIG_A NIX_CONFIG_B'
+  assert_output --regexp 'linux-builder: .*NIX_CONFIG NIX_CONFIG_A NIX_CONFIG_B NIX_CONFIG_C'
   refute_output --partial 'connect-timeout'
   refute_output --partial 'http-connections'
   refute_output --partial '/secrets/env.conf'
+}
+
+@test "missing include targets are warned about, wherever they are in the chain" {
+  run logs
+  assert_output --regexp 'linux-builder: WARN .*/secrets/absent\.conf'
+  assert_output --regexp 'linux-builder: WARN .*/secrets/absent-nested\.conf'
 }
 
 @test "builder's own nix works, without reading the root-only config" {
