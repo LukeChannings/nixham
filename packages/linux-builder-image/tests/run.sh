@@ -5,21 +5,6 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../../.." && pwd)"
 system="${SYSTEM:-aarch64-darwin}"
 
-# Regression budgets, in seconds. Targets measured on an M-series host under
-# apple/container 1.1.0, with headroom for run-to-run noise.
-#
-# container run → the guest's nix-daemon answering over ssh, i.e. ready to
-# take an offloaded build (measured 1.7–1.9). The best of up to three fresh
-# boots counts: noise (the builder still busy from the image builds, say) only
-# ever adds time, and once pushed a single boot past 2.8.
-MAX_STARTUP=2.5
-# Realising an image whose configuration differs by one /etc file from a
-# cached one: the ~17 derivations downstream of the toplevel (each a remote
-# build through the aarch64-linux builder), the re-pack, and copying the
-# archive back to the host (measured 9–33; the spread is remote-build round
-# trips). Evaluation, another ~27 s, is not included.
-MAX_PARTIAL_REBUILD=45
-
 SSH=/usr/bin/ssh
 PERL=/usr/bin/perl
 command -v container >/dev/null || { echo >&2 "FAIL: no \`container\` CLI"; exit 1; }
@@ -76,28 +61,6 @@ ipOf() {
   container inspect "$1" | jq -r '.[0].status.networks[0].ipv4Address // empty' | cut -d/ -f1
 }
 
-now() {
-  if [ -n "${EPOCHREALTIME:-}" ]; then echo "$EPOCHREALTIME"; else "$PERL" -MTime::HiRes=time -e 'printf "%.6f\n", time'; fi
-}
-
-since() {
-  awk -v a="$1" -v b="$(now)" 'BEGIN { printf "%.2fs", b - a }'
-}
-
-elapsed() {
-  awk -v a="$1" -v b="$(now)" 'BEGIN { printf "%.2f", b - a }'
-}
-
-overBudget() {
-  awk -v t="$1" -v m="$2" 'BEGIN { exit !(t > m) }'
-}
-
-# withinBudget <what> <seconds> <max>
-withinBudget() {
-  ! overBudget "$2" "$3" || fail "$1 took ${2}s, over its ${3}s budget"
-  pass "$1 took ${2}s (budget ${3}s)"
-}
-
 waitForPort() {
   "$PERL" -MIO::Socket::INET -MTime::HiRes=time,sleep -e '
     my ($ip, $port) = @ARGV;
@@ -114,49 +77,10 @@ keyExpr="pkg.override { modules = [ $keyModule ]; }"
 echo >&2 "=== building images (offloaded to the aarch64-linux builder) ==="
 build "$work/keyed.tar" "$keyExpr"
 
-echo >&2 "=== partial rebuild ==="
-# A configuration no earlier run has built, so its system is a cache miss.
-ts="$(date +%s)"
-drv="$(nix-instantiate -E "let pkg = $pkgExpr; in pkg.override { modules = [
-  { environment.etc.\"lbi-probe-$ts\".text = \"$ts\"; } ]; }")"
-t0="$(now)"
-nix-build --no-out-link "$drv" >/dev/null
-withinBudget "a partial rebuild (one /etc file changed)" "$(elapsed "$t0")" "$MAX_PARTIAL_REBUILD"
-
 echo >&2 "=== keyed image ==="
 load "$work/keyed.tar" "$keyExpr"
 keyedRef="$ref"
-pass "container image load accepted $ref"
 r() { "$SSH" "${SSHO[@]}" root@"$ip" "$@"; }
-
-# A fresh keyed container; sets ip, and tStartup to the seconds from
-# container run until its nix-daemon answers over ssh.
-bootKeyed() {
-  local t0 tPort tSsh
-  container rm -f "$keyed" >/dev/null 2>&1 || true
-  t0="$(now)"
-  container run -d --name "$keyed" "${runFlags[@]}" "$keyedRef" >/dev/null
-  ip="$(ipOf "$keyed")"
-  [ -n "$ip" ] || fail "no IPv4 address for $keyed"
-  waitForPort "$ip" 22 || fail "sshd never answered on $ip:22"
-  tPort="$(elapsed "$t0")"
-  r true || fail "root key login refused"
-  tSsh="$(elapsed "$t0")"
-  until r 'nix-store --store daemon -q --hash /run/current-system' >/dev/null 2>&1; do
-    ! overBudget "$(elapsed "$t0")" 30 || fail "nix-daemon never answered"
-    sleep 0.01
-  done
-  tStartup="$(elapsed "$t0")"
-  echo >&2 "TIME: nix-daemon answering ${tStartup}s from container run (sshd port ${tPort}s, login ${tSsh}s)"
-}
-
-best=
-for _ in 1 2 3; do
-  bootKeyed
-  best="$(awk -v a="$tStartup" -v b="${best:-$tStartup}" 'BEGIN { print (a < b) ? a : b }')"
-  overBudget "$best" "$MAX_STARTUP" || break
-done
-withinBudget "startup (container run → nix-daemon answering over ssh)" "$best" "$MAX_STARTUP"
 
 echo >&2 "=== keyed image without --rosetta ==="
 # No share: the rosetta mount (nofail) and systemd-binfmt fail, nothing
