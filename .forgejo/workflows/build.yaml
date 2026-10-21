@@ -1,0 +1,71 @@
+---
+name: Build
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Build
+    runs-on: nixos-latest-arm64
+    steps:
+      - name: Checkout
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+          TOKEN: ${{ github.token }}
+        run: >-
+          git clone --depth 1 -b "${HEAD_REF:-$REF_NAME}"
+          "https://$TOKEN@forge.channings.me/$GITHUB_REPOSITORY.git" .
+      - name: Build
+        run: >-
+          nix-build -E
+          'builtins.getAttr builtins.currentSystem (import ./. { }).packages'
+      # Fork PRs get no secrets.
+      - name: Push to nix.channings.me
+        if: >-
+          github.event_name == 'push'
+          || github.event.pull_request.head.repo.full_name == github.repository
+        uses: ./.forgejo/actions/niks3-push
+        with:
+          token: ${{ secrets.NIKS3_CI_TOKEN }}
+          paths: ./result*
+
+  publish:
+    name: Publish ${{ matrix.name }}
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: nixos-latest-arm64
+    strategy:
+      matrix:
+        include:
+          - name: linux-builder
+            attr: linux-builder-image
+            transport: oci-archive
+    steps:
+      - name: Checkout
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+          TOKEN: ${{ github.token }}
+        run: >-
+          git clone --depth 1 -b "${HEAD_REF:-$REF_NAME}"
+          "https://$TOKEN@forge.channings.me/$GITHUB_REPOSITORY.git" .
+      - name: Push to forge.channings.me
+        env:
+          FORGE_PAT: ${{ secrets.FORGE_PAT }}
+          owner: ${{ github.repository_owner }}
+          name: ${{ matrix.name }}
+          attr: ${{ matrix.attr }}
+          transport: ${{ matrix.transport }}
+        run: |
+          set -euo pipefail
+          skopeo=$(nix-shell --run 'command -v skopeo')
+          image=$(nix-build --no-out-link -A "$attr")
+          ref="forge.channings.me/${owner,,}/$name"
+          for tag in "$GITHUB_SHA" latest; do
+            "$skopeo" --insecure-policy copy --dest-creds "forgejo:$FORGE_PAT" \
+              "$transport:$image" "docker://$ref:$tag"
+          done

@@ -61,6 +61,7 @@
             just
             # bats --jobs
             parallel
+            skopeo
             treefmt.config.build.wrapper
           ];
         };

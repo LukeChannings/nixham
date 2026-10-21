@@ -1,0 +1,23 @@
+---
+name: Test
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Test
+    runs-on: nixos-latest
+    steps:
+      - name: Checkout
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+          TOKEN: ${{ github.token }}
+        run: >-
+          git clone --depth 1 -b "${HEAD_REF:-$REF_NAME}"
+          "https://$TOKEN@forge.channings.me/$GITHUB_REPOSITORY.git" .
+      - name: Test
+        run: nix-shell --run 'just test'

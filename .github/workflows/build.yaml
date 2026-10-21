@@ -1,0 +1,79 @@
+---
+name: Build
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-24.04-arm
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      # yamllint disable-line rule:line-length
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa  # v23
+        with:
+          determinate: false
+      - uses: ./.forgejo/actions/substituter
+      - name: Build
+        run: >-
+          nix-build -E
+          'builtins.getAttr builtins.currentSystem (import ./. { }).packages'
+      # Fork PRs get no secrets.
+      - name: Push to nix.channings.me
+        if: >-
+          github.event_name == 'push'
+          || github.event.pull_request.head.repo.full_name == github.repository
+        uses: ./.forgejo/actions/niks3-push
+        with:
+          token: ${{ secrets.NIKS3_CI_TOKEN }}
+          paths: ./result*
+
+  publish:
+    name: Publish ${{ matrix.name }}
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: linux-builder
+            attr: linux-builder-image
+            transport: oci-archive
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      # yamllint disable-line rule:line-length
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa  # v23
+        with:
+          determinate: false
+      - uses: ./.forgejo/actions/substituter
+      - name: Push to ghcr.io
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          name: ${{ matrix.name }}
+          attr: ${{ matrix.attr }}
+          transport: ${{ matrix.transport }}
+        run: |
+          set -euo pipefail
+          skopeo=$(nix-shell --run 'command -v skopeo')
+          image=$(nix-build --no-out-link -A "$attr")
+          ref="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/$name"
+          for tag in "$GITHUB_SHA" latest; do
+            "$skopeo" --insecure-policy copy \
+              --dest-creds "$GITHUB_ACTOR:$GITHUB_TOKEN" \
+              "$transport:$image" "docker://$ref:$tag"
+          done
