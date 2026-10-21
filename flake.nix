@@ -6,6 +6,8 @@
     flake-compat.flake = false;
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+    nix2container.url = "github:nlewo/nix2container";
+    nix2container.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -14,6 +16,7 @@
       nixpkgs,
       flake-utils,
       treefmt-nix,
+      nix2container,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -26,6 +29,10 @@
         packages = {
           apple-container-kernel = pkgs.callPackage ./packages/apple-container-kernel/package.nix {
             inherit (pkgs) path;
+          };
+          linux-builder-image = pkgs.callPackage ./packages/linux-builder-image/package.nix {
+            inherit (pkgs) path;
+            inherit nix2container;
           };
           skill-nixify = pkgs.callPackage ./skills/nixify/package.nix { };
         };
