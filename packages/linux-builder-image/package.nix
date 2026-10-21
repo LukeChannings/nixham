@@ -38,6 +38,7 @@ pkgs.runCommand "linux-builder-oci.tar"
     passthru = {
       nixosConfig = nixos.config;
       inherit imageRef image;
+      inherit (image) imageTag;
     };
   }
   ''
