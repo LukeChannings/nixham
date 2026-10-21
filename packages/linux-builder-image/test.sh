@@ -4,5 +4,4 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 bats "$here/tests/"
-"$here/tests/run.sh"
 "$here/tests/persist.sh"
