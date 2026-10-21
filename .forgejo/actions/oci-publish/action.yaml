@@ -1,0 +1,44 @@
+---
+name: OCI publish
+description: >-
+  Push the image built by a nix attribute to a registry under its imageTag, and
+  point latest at it. Skips the build and push when the registry already has
+  that tag, so only a changed closure is published. Uses the skopeo on PATH,
+  else the one in nixham's nixpkgs.
+
+inputs:
+  attr:
+    description: nix-build attribute of the image; it must expose imageTag
+    required: true
+  transport:
+    description: skopeo transport of the build output, e.g. oci-archive
+    required: true
+  registry:
+    description: Registry host; the image goes to <registry>/<owner>/<name>
+    required: true
+  name:
+    description: Image name within the repository owner's namespace
+    required: true
+  creds:
+    description: Registry credentials as username:password
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Publish ${{ inputs.name }} to ${{ inputs.registry }}
+      shell: bash
+      env:
+        action_path: ${{ github.action_path }}
+        attr: ${{ inputs.attr }}
+        transport: ${{ inputs.transport }}
+        registry: ${{ inputs.registry }}
+        name: ${{ inputs.name }}
+        creds: ${{ inputs.creds }}
+      run: |
+        set -euo pipefail
+        if ! command -v skopeo >/dev/null; then
+          PATH=$(nix-build --no-out-link "$action_path/skopeo.nix")/bin:$PATH
+        fi
+        export ref="$registry/$GITHUB_REPOSITORY_OWNER/$name"
+        "$BASH" "$action_path/publish.sh"

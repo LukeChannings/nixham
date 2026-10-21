@@ -12,6 +12,7 @@ Nixham (_/ˈnixəm/_) is a small hamlet containing Nix stuff that hasn't yet bee
 - `.forgejo/actions/` - composite actions for GitHub and Forgejo
   - `substituter/` - substitute from `nix.channings.me`
   - `niks3-push/` - push store paths to `nix.channings.me` through niks3
+  - `oci-publish/` - push an image to a registry when its closure changes
 
 ## History
 
