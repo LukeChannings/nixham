@@ -30,10 +30,6 @@ pkgs.linux-builder-image.override {
 }
 ```
 
-and a keyed image whose shim registration is sabotaged (interpreter pointed
-at a missing file, `rosetta.service`'s `FailureAction` defused so the guest
-stays up for inspection).
-
 Expected tail:
 
 ```
@@ -46,9 +42,7 @@ PASS: 100/100 herd sessions succeeded
 PASS: container image load accepted linux-builder:…
 PASS: bare base-profile image refuses the login
 === keyed image without --rosetta ===
-PASS: without --rosetta the builder stops non-zero, FATAL in the boot log, sshd never started
-=== shim registration fails ===
-PASS: a failed shim registration leaves apple/container's handler, so the guest still runs x86_64; sshd held back
+PASS: without --rosetta the builder still serves aarch64-linux; x86_64 is simply unregistered
 === all checks passed ===
 ```
 
@@ -86,27 +80,26 @@ PASS: a failed shim registration leaves apple/container's handler, so the guest 
 
 ### Rosetta
 
-- Stage 2 mounts the `rosetta` virtiofs share at `/run/rosetta`, and
-  `rosetta.service` (ahead of `sysinit.target`; required by sshd and
-  nix-daemon) is active.
-- `/proc/sys/fs/binfmt_misc/rosetta-argv0` is enabled with `flags: PF`, and
-  apple/container's `x86_64` entry (flags `OCF`, argv0-discarding) is gone.
+- The `rosetta` virtiofs share is mounted at `/run/rosetta`, and
+  `virtualisation.rosetta`'s registration is the x86_64 handler:
+  `/proc/sys/fs/binfmt_misc/rosetta` is enabled with `flags: POCF`
+  (Rosetta honors the kernel's preserve-argv0 protocol; `C` implies `O`).
+  apple/container's own `x86_64` entry (flags `OCF`, argv0-discarding) is
+  gone, flushed by stock `systemd-binfmt` before it registers ours.
 - `nix config show` advertises `x86_64-linux` in `extra-platforms`, and
-  `sandbox-paths` carries `/run/rosetta` and the qemu `binfmt-P` wrapper.
+  `sandbox-paths` carries `/run/rosetta`.
 - **x86_64 builds.** An x86_64-linux `runCommand` built over ssh-ng reports
   `uname -m` = `x86_64`.
 - **The argv0 regression.** An x86_64-linux derivation runs an x86_64
   `python3.withPackages (ps: [ ps.six ])` env's `python3` and records
-  `sys.prefix`, which must be the env, not the base interpreter. (Under
-  apple/container's own handler it collapses to the base `python3-3.x`.)
-- **Without `--rosetta`** the keyed image stops on its own: the boot log
-  (`container logs --boot`) shows `FATAL: no 'rosetta' virtiofs share`,
-  `Dependency failed for SSH Daemon` / `Nix Daemon`, and vminitd reports a
-  non-zero exit (`status: 1`) — `rosetta.service`'s `FailureAction=exit`.
-- **Failed registration.** In the sabotaged image `rosetta.service` fails,
-  `rosetta-argv0` is absent, apple/container's `x86_64` entry is still
-  enabled, a static x86_64 busybox piped in via `container exec` still runs,
-  and sshd never started.
+  `sys.prefix`, which must be the env, not the base interpreter. The env's
+  `bin/python3` is a binary wrapper exec'ing the base interpreter under the
+  env's own argv[0]; under apple/container's argv0-discarding handler it
+  collapses to the base `python3-3.x`.
+- **Without `--rosetta`** the builder keeps working, aarch64-only: the
+  `nofail` mount and `systemd-binfmt` fail (the latter is the only failed
+  unit tolerated here), no x86_64 handler is registered, root still logs
+  in, and an aarch64-linux build over ssh-ng succeeds.
 
 ## Observed boot behaviour (apple/container 1.1.0)
 
@@ -168,20 +161,24 @@ stage 2's DB seeding, so that seeding runs with `build-users-group` unset.
   `Operation not permitted` and the boot is otherwise unchanged.
 - **`CAP_SYS_ADMIN`.** Without it stage 2 can't mount, and systemd dies as
   PID 1, which stops the container.
-- **systemd-binfmt flushes.** Run without arguments, `systemd-binfmt`
-  writes `-1` to `binfmt_misc/status` (unregistering *every* entry,
-  apple/container's included) before registering anything, and its
-  `ExecStop` unregisters everything again. A failed shim registration would
-  then leave the guest with no x86_64 handler at all. The unit is pointed at
-  `/etc/binfmt.d/nixos.conf` explicitly (no flush) and its `ExecStop` is
-  cleared; `rosetta.service` drops apple/container's entry only after
-  verifying ours.
-- **`/run/rosetta` via fstab cost ~1 s.** As a `fileSystems` entry, systemd
-  held `run-rosetta.mount` back behind its mountinfo rate limit (the same
-  stall `/run/wrappers` hit), delaying `sysinit.target` and sshd to ~2.8 s
-  time-to-ssh. Stage 2 mounts it instead (`boot.specialFileSystems`); a
-  failed mount there is only reported, and `rosetta.service` stops the
-  container.
+- **The argv0 shim era.** The image used to carry a C shim registered in
+  place of apple/container's handler, with a qemu-user fallback for execs
+  whose argv[0] differed from the binary, on the belief that Rosetta could
+  not preserve argv[0]. Rosetta honors the kernel's preserve-argv0 binfmt
+  protocol (verified live: the `withPackages` probe passes under a plain
+  `POCF` registration), so the shim, qemu, the patched `systemd-binfmt`
+  and the fail-fast `rosetta.service` are gone — `virtualisation.rosetta`
+  does the whole job.
+- **`systemd-binfmt` vs the share.** The `F` flag opens the interpreter at
+  registration, and upstream `systemd-binfmt` orders only against
+  `binfmt_misc`, not `run-rosetta.mount`; the base profile adds the
+  ordering.
+- **`/run/rosetta` via fstab once cost ~1 s.** In the shim era, as a
+  `fileSystems` entry, systemd held `run-rosetta.mount` back behind its
+  mountinfo rate limit (the same stall `/run/wrappers` hit), delaying
+  `sysinit.target` and sshd to ~2.8 s time-to-ssh, so stage 2 mounted it
+  instead. The stock module's fstab mount is back; `bench.sh` is the tool
+  to re-measure, and `run.sh`'s startup budget catches a regression.
 
 ## Persistent store volume — `persist.sh`
 

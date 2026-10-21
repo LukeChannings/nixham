@@ -40,16 +40,15 @@ work="$(mktemp -d)"
 keyed=lbi-probe-keyed
 bare=lbi-probe-bare
 norosetta=lbi-probe-norosetta
-broken=lbi-probe-broken
 images=()
 
 cleanup() {
   if [ "${KEEP:-}" = 1 ]; then
     echo >&2 "KEEP=1: leaving $keyed running; key at $work/key"
-    container rm -f "$bare" "$norosetta" "$broken" >/dev/null 2>&1 || true
+    container rm -f "$bare" "$norosetta" >/dev/null 2>&1 || true
     return
   fi
-  container rm -f "$keyed" "$bare" "$norosetta" "$broken" >/dev/null 2>&1 || true
+  container rm -f "$keyed" "$bare" "$norosetta" >/dev/null 2>&1 || true
   for i in "${images[@]}"; do container image rm "$i" >/dev/null 2>&1 || true; done
   rm -rf "$work"
 }
@@ -125,12 +124,6 @@ herdOk() {
 
 keyModule="{ users.users.root.openssh.authorizedKeys.keys = [ (builtins.readFile $work/key.pub) ]; }"
 keyExpr="pkg.override { modules = [ $keyModule ]; }"
-# The shim's registration fails (F opens a missing interpreter), and the
-# FailureAction is defused so the guest's binfmt state can be inspected.
-brokenExpr="pkg.override { modules = [ $keyModule ({ lib, ... }: {
-  boot.binfmt.registrations.rosetta-argv0.interpreter = lib.mkForce \"/nonexistent/rosetta-argv0-shim\";
-  systemd.services.rosetta.unitConfig.FailureAction = lib.mkForce \"none\";
-}) ]; }"
 
 x86="let pkgs = import (builtins.getFlake (toString $repo)).inputs.nixpkgs { system = \"x86_64-linux\"; }; in"
 
@@ -140,19 +133,9 @@ remoteBuild() {
     2>"$work/remote-build.log" | tail -1
 }
 
-waitStopped() {
-  local i
-  for i in $(seq "$2"); do
-    [ "$(container inspect "$1" | jq -r '.[0].status.state')" = stopped ] && return 0
-    sleep 1
-  done
-  return 1
-}
-
 echo >&2 "=== building images (offloaded to the aarch64-linux builder) ==="
 build "$work/keyed.tar" "$keyExpr"
 build "$work/bare.tar" "pkg"
-build "$work/broken.tar" "$brokenExpr"
 
 echo >&2 "=== partial rebuild ==="
 # A configuration no earlier run has built, so its system is a cache miss.
@@ -258,19 +241,19 @@ pass "host builds a derivation on the builder over ssh-ng"
 
 echo >&2 "=== Rosetta ==="
 r 'mountpoint -q /run/rosetta && [ -x /run/rosetta/rosetta ]' || fail "/run/rosetta is not the Rosetta share"
-[ "$(r 'systemctl is-active rosetta.service')" = active ] || fail "rosetta.service is not active"
 pass "the rosetta virtiofs share is mounted at /run/rosetta"
 
-reg="$(r 'cat /proc/sys/fs/binfmt_misc/rosetta-argv0' || true)"
-grep -qx enabled <<<"$reg" && grep -qx 'flags: PF' <<<"$reg" \
-  || fail "argv0-preserving handler not registered with PF: $reg"
+# virtualisation.rosetta's registration: Rosetta itself, preserve-argv0.
+# The kernel displays the requested PCF as POCF (C implies O).
+reg="$(r 'cat /proc/sys/fs/binfmt_misc/rosetta' || true)"
+grep -qx enabled <<<"$reg" && grep -qx 'flags: POCF' <<<"$reg" \
+  || fail "Rosetta not registered with POCF: $reg"
 r '[ ! -e /proc/sys/fs/binfmt_misc/x86_64 ]' || fail "apple/container's argv0-discarding handler is still registered"
-pass "x86_64 binfmt handler is the argv0 shim (PF); apple/container's is gone"
+pass "x86_64 binfmt handler is Rosetta with argv0 preserved (POCF); apple/container's is gone"
 
 grep -qE '^extra-platforms = .*\bx86_64-linux\b' <<<"$conf" || fail "x86_64-linux not in extra-platforms"
 grep -qE '^sandbox-paths = .*/run/rosetta\b' <<<"$conf" || fail "/run/rosetta not in sandbox-paths"
-grep -qE '^sandbox-paths = .*-qemu-x86_64-binfmt-P\b' <<<"$conf" || fail "qemu shim not in sandbox-paths"
-pass "nix advertises x86_64-linux and sandboxes the Rosetta share and qemu shim"
+pass "nix advertises x86_64-linux and sandboxes the Rosetta share"
 
 ts="$(date +%s)"
 out="$(remoteBuild "$x86 pkgs.runCommand \"lbi-x86-probe-$ts\" { } \"uname -m > \$out\"")" \
@@ -308,33 +291,23 @@ fi
 pass "bare base-profile image refuses the login"
 
 echo >&2 "=== keyed image without --rosetta ==="
+# No share: the rosetta mount (nofail) and systemd-binfmt fail, nothing
+# else; the container keeps serving aarch64-linux builds.
 container rm -f "$norosetta" >/dev/null 2>&1 || true
 container run -d --name "$norosetta" "${capFlags[@]}" "$keyedRef" >/dev/null
-waitStopped "$norosetta" 60 || fail "the builder kept running without --rosetta"
-boot="$(container logs --boot "$norosetta")"
-grep -qF "FATAL: no 'rosetta' virtiofs share" <<<"$boot" || fail "no FATAL in the boot log"
-grep -qF "Dependency failed for SSH Daemon" <<<"$boot" || fail "sshd was not held back"
-grep -qE "id: $norosetta, status: [1-9][0-9]* managed process exit" <<<"$boot" || fail "container exited zero"
-pass "without --rosetta the builder stops non-zero, FATAL in the boot log, sshd never started"
-
-echo >&2 "=== shim registration fails ==="
-bb="$(nix-build --no-out-link -E "$x86 pkgs.busybox-sandbox-shell")/bin/busybox"
-load "$work/broken.tar" "$brokenExpr"
-container rm -f "$broken" >/dev/null 2>&1 || true
-container run -d --name "$broken" "${runFlags[@]}" "$ref" >/dev/null
-x() { container exec "$broken" /run/current-system/sw/bin/sh -c "PATH=/run/current-system/sw/bin; $1"; }
-for i in $(seq 60); do
-  [ "$(x 'systemctl is-failed rosetta.service' 2>/dev/null || true)" = failed ] && break
-  sleep 1
-done
-[ "$(x 'systemctl is-failed rosetta.service' || true)" = failed ] || fail "rosetta.service did not fail on a broken registration"
-x '[ ! -e /proc/sys/fs/binfmt_misc/rosetta-argv0 ]' || fail "the broken handler registered anyway"
-[ "$(x 'head -n1 /proc/sys/fs/binfmt_misc/x86_64')" = enabled ] \
-  || fail "apple/container's handler was dropped before ours registered"
-[ "$(container exec -i "$broken" /run/current-system/sw/bin/sh -c \
-  'PATH=/run/current-system/sw/bin; cat > /tmp/busybox && chmod +x /tmp/busybox && /tmp/busybox sh -c "echo x86-ok"' <"$bb")" = x86-ok ] \
-  || fail "the guest cannot execute x86_64 after a failed registration"
-x '! systemctl is-active -q sshd.service' || fail "sshd started despite rosetta.service failing"
-pass "a failed shim registration leaves apple/container's handler, so the guest still runs x86_64; sshd held back"
+ip="$(ipOf "$norosetta")"
+[ -n "$ip" ] || fail "no IPv4 address for $norosetta"
+waitForPort "$ip" 22 || fail "sshd never answered without --rosetta"
+r true || fail "root key login refused without --rosetta"
+r 'systemctl is-system-running --wait' >/dev/null 2>&1 || true
+failed="$(r 'systemctl --failed --plain --no-legend' | awk '{print $1}')"
+[ -z "$(grep -vE '^(systemd-binfmt\.service|run-rosetta\.mount)$' <<<"$failed")" ] \
+  || fail "unexpected failed units without --rosetta: $(echo $failed)"
+r '[ ! -e /proc/sys/fs/binfmt_misc/rosetta ]' || fail "Rosetta registered without its share"
+out="$(PATH="/usr/bin:$PATH" NIX_SSHOPTS="${SSHO[*]}" \
+  nix build --no-link --print-out-paths --eval-store auto --store "ssh-ng://root@$ip" \
+  --expr "derivation { name = \"lbi-norosetta-$(date +%s)\"; system = \"aarch64-linux\"; builder = \"/bin/sh\"; args = [ \"-c\" \"echo ok > \$out\" ]; }" 2>/dev/null | tail -1)"
+[ -n "$out" ] && [ "$(r "cat $out")" = ok ] || fail "aarch64 build failed without --rosetta"
+pass "without --rosetta the builder still serves aarch64-linux; x86_64 is simply unregistered"
 
 echo >&2 "=== all checks passed ==="
