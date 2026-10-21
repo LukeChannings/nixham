@@ -5,6 +5,9 @@ SSH=/usr/bin/ssh
 NC=/usr/bin/nc
 PERL=/usr/bin/perl
 
+# Who r, remote_build and the herd log in as.
+SSH_USER=root
+
 SSHO=(-i "$BATS_SUITE_TMPDIR/key" -o IdentitiesOnly=yes -o IdentityAgent=none
   -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
   -o BatchMode=yes -o ConnectTimeout=20)
@@ -15,7 +18,8 @@ with_pkg() {
 }
 
 key_module() {
-  echo "{ users.users.root.openssh.authorizedKeys.keys = [ (builtins.readFile $BATS_SUITE_TMPDIR/key.pub) ]; }"
+  local key="(builtins.readFile $BATS_SUITE_TMPDIR/key.pub)"
+  echo "{ users.users.root.openssh.authorizedKeys.keys = [ $key ]; users.users.builder.openssh.authorizedKeys.keys = [ $key ]; }"
 }
 
 keyed_expr() {
@@ -62,10 +66,10 @@ x() {
     "$(cat "$BATS_FILE_TMPDIR/name")" /run/current-system/sw/bin/bash -c "$*"
 }
 
-# Runs a command in the file's container as root. /usr/bin/ssh: only Apple's
-# binaries are granted the macOS Local Network privacy permission.
+# Runs a command in the file's container over ssh as $SSH_USER. /usr/bin/ssh:
+# only Apple's binaries are granted the macOS Local Network privacy permission.
 r() {
-  "$SSH" "${SSHO[@]}" root@"$(current_ip)" "$@"
+  "$SSH" "${SSHO[@]}" "$SSH_USER@$(current_ip)" "$@"
 }
 
 # boot_container <name> <ref> [container run flags...]: a fresh container
@@ -102,7 +106,7 @@ remote_build() {
   local out
   out="$(PATH="/usr/bin:$PATH" NIX_SSHOPTS="${SSHO[*]}" \
     nix build --impure --no-link --print-out-paths --eval-store auto \
-    --store "ssh-ng://root@$(current_ip)" --expr "$1")" || return 1
+    --store "ssh-ng://$SSH_USER@$(current_ip)" --expr "$1")" || return 1
   tail -1 <<<"$out"
 }
 

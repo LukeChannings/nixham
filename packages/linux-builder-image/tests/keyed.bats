@@ -21,6 +21,22 @@ x86() {
   assert_success
 }
 
+@test "builder logs in with the key provided via modules" {
+  SSH_USER=builder run r whoami
+  assert_output builder
+}
+
+@test "builder is a trusted Nix user" {
+  SSH_USER=builder run r 'nix store info --store daemon'
+  assert_line --regexp '^Trusted: 1$'
+}
+
+@test "the host builds on the builder over ssh-ng as builder" {
+  out="$(SSH_USER=builder remote_build "$(probe_expr builder)")"
+  run x "cat $out"
+  assert_output ok
+}
+
 @test "systemd is PID 1" {
   run x 'ps -o comm= -p 1'
   assert_output systemd

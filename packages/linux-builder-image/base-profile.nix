@@ -136,7 +136,11 @@ in
     };
   };
 
+  # As nixpkgs' profiles/nix-builder.nix, the Darwin builder VM.
+  users.users.builder.isNormalUser = true;
+
   nix.settings = {
+    trusted-users = [ "builder" ];
     experimental-features = [
       "nix-command"
       "flakes"
