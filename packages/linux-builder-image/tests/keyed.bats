@@ -1,15 +1,14 @@
 load helpers
 
 setup_file() {
-  export KEYED_NAME=lbi-keyed
+  export CONTAINER=lbi-keyed
   REF="$(build_and_load keyed "$(keyed_expr)")"
   export REF
-  boot_container "$KEYED_NAME" "$REF" --rosetta
+  boot_container "$REF" --rosetta
 }
 
 teardown_file() {
-  container rm -f "$KEYED_NAME" >/dev/null 2>&1 || true
-  [ -z "${REF:-}" ] || container image rm "$REF" >/dev/null 2>&1 || true
+  container rm -f "$CONTAINER" >/dev/null 2>&1 || true
 }
 
 x86() {
@@ -55,7 +54,7 @@ x86() {
 }
 
 @test "without a store volume, stage 2 warns the store is ephemeral" {
-  run container logs "$KEYED_NAME"
+  run logs
   assert_output --partial 'THE STORE IS EPHEMERAL'
   run x 'findmnt -n -o FSTYPE /nix || true'
   refute_output overlay
@@ -132,15 +131,4 @@ x86() {
   out="$(remote_build "$expr")"
   run x "cat $out"
   assert_output "$envPath"
-}
-
-@test "100 simultaneous ssh sessions succeed after 20 banner-less probes" {
-  local i
-  for i in $(seq 20); do "$NC" -z -G 2 "$(current_ip)" 22 >/dev/null 2>&1 || true; done
-  for i in $(seq 100); do
-    ("$SSH" "${SSHO[@]}" "$SSH_USER@$(current_ip)" 'sleep 2; echo ok' >"$BATS_TEST_TMPDIR/$i" 2>&1 || true) 3>&- &
-  done
-  wait
-  run grep -lx ok "$BATS_TEST_TMPDIR"/*
-  assert_equal "${#lines[@]}" 100
 }

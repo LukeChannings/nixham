@@ -26,11 +26,20 @@ keyed_expr() {
   echo "pkg.override { modules = [ $(key_module) ]; }"
 }
 
-# build_and_load <label> <expr>: loads the image into the runtime, prints its ref.
+# build_and_load <label> <expr>: loads the image into the runtime, prints its
+# ref. Files share images, so teardown_suite removes them. One load at a time:
+# under --jobs, concurrent loads lose images. --fallback: a failing substituter
+# should cost a build, not the suite.
 build_and_load() {
-  nix-build -o "$BATS_FILE_TMPDIR/$1.tar" -E "$(with_pkg "$2")" >/dev/null
-  container image load -i "$BATS_FILE_TMPDIR/$1.tar" >/dev/null
-  nix-instantiate --eval --raw -E "$(with_pkg "($2).imageRef")"
+  local ref status=0
+  nix-build --fallback -o "$BATS_FILE_TMPDIR/$1.tar" -E "$(with_pkg "$2")" >/dev/null || return
+  until mkdir "$BATS_RUN_TMPDIR/image-load.lock" 2>/dev/null; do sleep 0.1; done
+  container image load -i "$BATS_FILE_TMPDIR/$1.tar" >/dev/null || status=$?
+  rmdir "$BATS_RUN_TMPDIR/image-load.lock"
+  [ "$status" = 0 ] || return "$status"
+  ref="$(nix-instantiate --eval --raw -E "$(with_pkg "($2).imageRef")")"
+  echo "$ref" >>"$BATS_RUN_TMPDIR/images"
+  echo "$ref"
 }
 
 container_ip() {
@@ -55,36 +64,41 @@ elapsed() {
   awk -v a="$1" -v b="$(now)" 'BEGIN { printf "%.2f", b - a }'
 }
 
-# The IP of the file's container, as recorded by boot_container.
+# The IP of $CONTAINER, as recorded by boot_container.
 current_ip() {
-  cat "$BATS_FILE_TMPDIR/ip"
+  cat "$BATS_RUN_TMPDIR/$CONTAINER.ip"
 }
 
-# Runs a command in the file's container as root, through the runtime: no ssh.
+# Runs a command in $CONTAINER as root, through the runtime: no ssh.
 x() {
   container exec -e PATH=/run/wrappers/bin:/run/current-system/sw/bin \
-    "$(cat "$BATS_FILE_TMPDIR/name")" /run/current-system/sw/bin/bash -c "$*"
+    "$CONTAINER" /run/current-system/sw/bin/bash -c "$*"
 }
 
-# Runs a command in the file's container over ssh as $SSH_USER. /usr/bin/ssh:
+# Runs a command in $CONTAINER over ssh as $SSH_USER. /usr/bin/ssh:
 # only Apple's binaries are granted the macOS Local Network privacy permission.
 r() {
   "$SSH" "${SSHO[@]}" "$SSH_USER@$(current_ip)" "$@"
 }
 
-# boot_container <name> <ref> [container run flags...]: a fresh container
-# (rm + run) whose sshd answers; records its name for x and its IP for r.
+# boot_container <ref> [container run flags...]: $CONTAINER, fresh (rm + run),
+# once its sshd answers. Names are unique per file, or per test where a test
+# needs its own, so that tests can run in any order and in parallel (--jobs).
 boot_container() {
-  local name=$1 ref=$2 addr
-  shift 2
-  container rm -f "$name" >/dev/null 2>&1 || true
-  container run -d --name "$name" --cap-add CAP_SYS_ADMIN --cap-add CAP_NET_ADMIN \
+  local ref=$1 addr
+  shift
+  container rm -f "$CONTAINER" >/dev/null 2>&1 || true
+  container run -d --name "$CONTAINER" --cap-add CAP_SYS_ADMIN --cap-add CAP_NET_ADMIN \
     --kernel "$LBI_KERNEL" "$@" "$ref" >/dev/null
-  addr="$(container_ip "$name")"
-  [ -n "$addr" ] || fail "no IPv4 address for $name"
-  echo "$name" >"$BATS_FILE_TMPDIR/name"
-  echo "$addr" >"$BATS_FILE_TMPDIR/ip"
+  addr="$(container_ip "$CONTAINER")"
+  [ -n "$addr" ] || fail "no IPv4 address for $CONTAINER"
+  echo "$addr" >"$BATS_RUN_TMPDIR/$CONTAINER.ip"
   wait_for_port "$addr" 22 || fail "sshd never answered on $addr:22"
+}
+
+# The container logs of $CONTAINER.
+logs() {
+  container logs "$CONTAINER" 2>/dev/null || true
 }
 
 # assert_no_failed_units [allowed-unit-regex]

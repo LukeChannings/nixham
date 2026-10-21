@@ -1,14 +1,13 @@
 load helpers
 
 setup_file() {
-  export BENCH_NAME=lbi-bench
+  export CONTAINER=lbi-bench
   REF="$(build_and_load bench "$(keyed_expr)")"
   export REF
 }
 
 teardown_file() {
-  container rm -f "$BENCH_NAME" >/dev/null 2>&1 || true
-  [ -z "${REF:-}" ] || container image rm "$REF" >/dev/null 2>&1 || true
+  container rm -f "$CONTAINER" >/dev/null 2>&1 || true
 }
 
 # Seconds from container run until the guest's nix-daemon answers over ssh,
@@ -16,7 +15,7 @@ teardown_file() {
 boot_to_ready() {
   local t0
   t0="$(now)"
-  boot_container "$BENCH_NAME" "$REF" --rosetta
+  boot_container "$REF" --rosetta
   until r 'nix-store --store daemon -q --hash /run/current-system' >/dev/null 2>&1; do
     awk -v t="$(elapsed "$t0")" 'BEGIN { exit !(t > 30) }' && fail "nix-daemon never answered"
     sleep 0.01

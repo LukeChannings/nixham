@@ -1,15 +1,14 @@
 load helpers
 
 setup_file() {
-  export NOROSETTA_NAME=lbi-norosetta
+  export CONTAINER=lbi-norosetta
   REF="$(build_and_load norosetta "$(keyed_expr)")"
   export REF
-  boot_container "$NOROSETTA_NAME" "$REF"
+  boot_container "$REF"
 }
 
 teardown_file() {
-  container rm -f "$NOROSETTA_NAME" >/dev/null 2>&1 || true
-  [ -z "${REF:-}" ] || container image rm "$REF" >/dev/null 2>&1 || true
+  container rm -f "$CONTAINER" >/dev/null 2>&1 || true
 }
 
 @test "builder still logs in with the key" {

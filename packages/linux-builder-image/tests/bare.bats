@@ -1,15 +1,14 @@
 load helpers
 
 setup_file() {
-  export BARE_NAME=lbi-bare
+  export CONTAINER=lbi-bare
   REF="$(build_and_load bare pkg)"
   export REF
-  boot_container "$BARE_NAME" "$REF" --rosetta
+  boot_container "$REF" --rosetta
 }
 
 teardown_file() {
-  container rm -f "$BARE_NAME" >/dev/null 2>&1 || true
-  [ -z "${REF:-}" ] || container image rm "$REF" >/dev/null 2>&1 || true
+  container rm -f "$CONTAINER" >/dev/null 2>&1 || true
 }
 
 @test "the archive's embedded ref equals passthru.imageRef" {
