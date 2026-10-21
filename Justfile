@@ -17,13 +17,13 @@ check:
 
 alias lint := check
 
-# If the project distinguishes unit and integration tests, split into
-# `test-unit` and `test-integration` recipes and make `test` run both:
-#   test: test-unit test-integration
+# Live suites: they need macOS, apple/container and the host's builder;
+# nix flake check cannot run them (see the tests' README).
 
 # Run the test suite
 test:
-    @echo 'No tests: this repo only ships Nix packages (see `just check`)'
+    packages/linux-builder-image/tests/run.sh
+    packages/linux-builder-image/tests/persist.sh
 
 # Build all packages
 build:
