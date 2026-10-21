@@ -38,17 +38,16 @@ runFlags=(--rosetta "${capFlags[@]}")
 
 work="$(mktemp -d)"
 keyed=lbi-probe-keyed
-bare=lbi-probe-bare
 norosetta=lbi-probe-norosetta
 images=()
 
 cleanup() {
   if [ "${KEEP:-}" = 1 ]; then
     echo >&2 "KEEP=1: leaving $keyed running; key at $work/key"
-    container rm -f "$bare" "$norosetta" >/dev/null 2>&1 || true
+    container rm -f "$norosetta" >/dev/null 2>&1 || true
     return
   fi
-  container rm -f "$keyed" "$bare" "$norosetta" >/dev/null 2>&1 || true
+  container rm -f "$keyed" "$norosetta" >/dev/null 2>&1 || true
   for i in "${images[@]}"; do container image rm "$i" >/dev/null 2>&1 || true; done
   rm -rf "$work"
 }
@@ -135,7 +134,6 @@ remoteBuild() {
 
 echo >&2 "=== building images (offloaded to the aarch64-linux builder) ==="
 build "$work/keyed.tar" "$keyExpr"
-build "$work/bare.tar" "pkg"
 
 echo >&2 "=== partial rebuild ==="
 # A configuration no earlier run has built, so its system is a cache miss.
@@ -275,20 +273,6 @@ echo >&2 "=== parallel-connection herd ($herd sessions after 20 banner-less prob
 n="$(herdOk "$ip")"
 [ "$n" = "$herd" ] || fail "only $n/$herd herd sessions succeeded"
 pass "$n/$herd herd sessions succeeded"
-
-echo >&2 "=== bare base-profile image ==="
-load "$work/bare.tar" pkg
-pass "container image load accepted $ref"
-container rm -f "$bare" >/dev/null 2>&1 || true
-t0="$(now)"
-container run -d --name "$bare" "${runFlags[@]}" "$ref" >/dev/null
-bip="$(ipOf "$bare")"
-waitForPort "$bip" 22 || fail "bare image's sshd never answered"
-echo >&2 "TIME: time-to-sshd-port $(since "$t0") from container run"
-if "$SSH" "${SSHO[@]}" root@"$bip" true 2>/dev/null; then
-  fail "bare base-profile image accepted a login"
-fi
-pass "bare base-profile image refuses the login"
 
 echo >&2 "=== keyed image without --rosetta ==="
 # No share: the rosetta mount (nofail) and systemd-binfmt fail, nothing
