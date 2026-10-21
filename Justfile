@@ -53,12 +53,6 @@ test *NAMES:
 build:
     nix-build -A skill-nixify -A apple-container-kernel -A linux-builder-image
 
-# Nothing in this repo is runnable
-run *ARGS:
-    @echo 'No runnable package in this repo' >&2; exit 1
-
-alias start := run
-
 # Create a worktree at .worktree/<issue>-<slug> on a matching branch, then prime it
 worktree issue slug:
     git worktree add .worktree/{{ issue }}-{{ slug }} -b {{ issue }}-{{ slug }}
