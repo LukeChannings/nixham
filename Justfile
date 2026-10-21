@@ -18,13 +18,17 @@ check:
 alias lint := check
 
 # Live suites: they need macOS, apple/container and the host's builder;
-# nix flake check cannot run them.
+# nix flake check cannot run them. A suite filtered down to nothing (e.g.
+# `just test -- --filter 'some test'`) is not a failure.
 
-# Run every test.sh in the repo, or only those whose directory is named NAMES
+# Run every test.sh in the repo, or those whose directory is named NAMES; bats arguments go after --
+[positional-arguments]
 test *NAMES:
     #!/usr/bin/env bash
     set -euo pipefail
-    names=({{ NAMES }})
+    names=() args=()
+    while [ $# -gt 0 ] && [ "$1" != -- ]; do names+=("$1"); shift; done
+    [ $# -eq 0 ] || { shift; args=(--allow-empty-suite "$@"); }
     mapfile -t all < <(find . \( -name .git -o -name .worktree -o -name 'result*' \) -prune -o -name test.sh -print | sort)
     suites=()
     if [ ${#names[@]} -eq 0 ]; then
@@ -41,7 +45,7 @@ test *NAMES:
     status=0
     for s in "${suites[@]}"; do
       echo "=== $s ===" >&2
-      "$s" || status=1
+      "$s" "${args[@]}" || status=1
     done
     exit "$status"
 

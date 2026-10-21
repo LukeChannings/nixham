@@ -52,13 +52,15 @@
         };
 
         devShells.default = pkgs.mkShell {
-          packages = [
-            (pkgs.bats.withLibraries (p: [
+          packages = with pkgs; [
+            (bats.withLibraries (p: [
               p.bats-support
               p.bats-assert
             ]))
-            pkgs.jq
-            pkgs.just
+            jq
+            just
+            # bats --jobs
+            parallel
             treefmt.config.build.wrapper
           ];
         };
