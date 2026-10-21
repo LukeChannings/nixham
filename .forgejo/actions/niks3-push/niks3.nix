@@ -1,1 +1,1 @@
-(import ../.. { }).inputs.nixpkgs.legacyPackages.${builtins.currentSystem}.niks3
+(import ../../.. { }).inputs.nixpkgs.legacyPackages.${builtins.currentSystem}.niks3
