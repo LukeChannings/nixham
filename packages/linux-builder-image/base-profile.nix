@@ -8,6 +8,32 @@
 
 let
   inherit (lib) mkDefault mkForce;
+
+  # What `container run` passed in, read once at boot: /config, copied here.
+  # Root-only and in RAM, so private keys and tokens never reach a disk.
+  snapshot = "/run/linux-builder";
+
+  runtimeConfig = pkgs.writeShellScript "linux-builder-runtime-config" ''
+    set -u
+    export PATH=${lib.makeBinPath [ pkgs.coreutils ]}
+
+    log() { echo "linux-builder: $*" >&2; }
+
+    rm -rf ${snapshot}
+    # Traversable, not listable: builder's own nix stats the root-only
+    # includes (and skips them), sshd reads authorized_keys.d as the user.
+    mkdir -m 0711 ${snapshot}
+    if [ -d /config ]; then
+      cp -RL /config ${snapshot}/config || log "WARN could not copy all of /config"
+      chown -R 0:0 ${snapshot}/config
+      chmod -R u=rwX,go= ${snapshot}/config
+      chmod 0711 ${snapshot}/config
+      if [ -d ${snapshot}/config/ssh/authorized_keys.d ]; then
+        chmod 0711 ${snapshot}/config/ssh
+        chmod -R go+rX ${snapshot}/config/ssh/authorized_keys.d
+      fi
+    fi
+  '';
 in
 {
   imports = [
@@ -138,6 +164,15 @@ in
 
   # As nixpkgs' profiles/nix-builder.nix, the Darwin builder VM.
   users.users.builder.isNormalUser = true;
+
+  # After ./persistent-store.nix's mkBefore: its seeding never sees this.
+  boot.postBootCommands = ''
+    ${runtimeConfig}
+  '';
+
+  nix.extraOptions = ''
+    !include ${snapshot}/config/nix.conf
+  '';
 
   nix.settings = {
     trusted-users = [ "builder" ];

@@ -101,6 +101,18 @@ boot_container() {
   wait_for_port "$addr" 22 || fail "sshd never answered on $addr:22"
 }
 
+# boot_mounted <ref> <dir> [container run flags...]: boot_container, with
+# whichever of <dir>/config and <dir>/secrets exist bind-mounted read-only at
+# /config and /secrets.
+boot_mounted() {
+  local ref=$1 dir=$2 mounts=() d
+  shift 2
+  for d in config secrets; do
+    [ ! -d "$dir/$d" ] || mounts+=(--mount "type=bind,source=$dir/$d,target=/$d,readonly")
+  done
+  boot_container "$ref" "${mounts[@]}" "$@"
+}
+
 # The container logs of $CONTAINER.
 logs() {
   container logs "$CONTAINER" 2>/dev/null || true
