@@ -179,6 +179,7 @@ in
   services.openssh = {
     enable = true;
     startWhenNeeded = false;
+    authorizedKeysFiles = [ "${snapshot}/config/ssh/authorized_keys.d/%u" ];
     settings = {
       PermitRootLogin = mkDefault "no";
       PasswordAuthentication = false;

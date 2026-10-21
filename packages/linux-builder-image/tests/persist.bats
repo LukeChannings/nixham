@@ -90,7 +90,7 @@ probe() {
   boot "$REF_A"
   assert_clean_previous_shutdown
 
-  run env PATH="/usr/bin:$PATH" NIX_SSHOPTS="${SSHO[*]}" \
+  run env PATH="/usr/bin:$PATH" NIX_SSHOPTS="${SSHO[*]} -i $SSH_KEY" \
     nix copy --no-check-sigs --from "ssh-ng://$SSH_USER@$(current_ip)" "$out"
   echo "$out" >"$BATS_TEST_TMPDIR/imported"
   assert_success

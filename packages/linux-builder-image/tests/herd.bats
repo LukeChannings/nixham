@@ -16,7 +16,7 @@ teardown_file() {
   local i
   for i in $(seq 20); do "$NC" -z -G 2 "$(current_ip)" 22 >/dev/null 2>&1 || true; done
   for i in $(seq 100); do
-    ("$SSH" "${SSHO[@]}" "$SSH_USER@$(current_ip)" 'sleep 2; echo ok' >"$BATS_TEST_TMPDIR/$i" 2>&1 || true) 3>&- &
+    ("$SSH" "${SSHO[@]}" -i "$SSH_KEY" "$SSH_USER@$(current_ip)" 'sleep 2; echo ok' >"$BATS_TEST_TMPDIR/$i" 2>&1 || true) 3>&- &
   done
   wait
   run grep -lx ok "$BATS_TEST_TMPDIR"/*

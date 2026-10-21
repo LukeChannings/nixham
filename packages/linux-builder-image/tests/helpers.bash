@@ -5,10 +5,11 @@ SSH=/usr/bin/ssh
 NC=/usr/bin/nc
 PERL=/usr/bin/perl
 
-# Who r, remote_build and the herd log in as.
+# Who r, remote_build and the herd log in as, and with which key.
 SSH_USER=builder
+SSH_KEY="$BATS_SUITE_TMPDIR/key"
 
-SSHO=(-i "$BATS_SUITE_TMPDIR/key" -o IdentitiesOnly=yes -o IdentityAgent=none
+SSHO=(-o IdentitiesOnly=yes -o IdentityAgent=none
   -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
   -o BatchMode=yes -o ConnectTimeout=20)
 
@@ -84,7 +85,7 @@ x() {
 # Runs a command in $CONTAINER over ssh as $SSH_USER. /usr/bin/ssh:
 # only Apple's binaries are granted the macOS Local Network privacy permission.
 r() {
-  "$SSH" "${SSHO[@]}" "$SSH_USER@$(current_ip)" "$@"
+  "$SSH" "${SSHO[@]}" -i "$SSH_KEY" "$SSH_USER@$(current_ip)" "$@"
 }
 
 # boot_container <ref> [container run flags...]: $CONTAINER, fresh (rm + run),
@@ -136,7 +137,7 @@ assert_no_failed_units() {
 # as the host's nix-daemon offloads; prints the out path.
 remote_build() {
   local out
-  out="$(PATH="/usr/bin:$PATH" NIX_SSHOPTS="${SSHO[*]}" \
+  out="$(PATH="/usr/bin:$PATH" NIX_SSHOPTS="${SSHO[*]} -i $SSH_KEY" \
     nix build --impure --no-link --print-out-paths --eval-store auto \
     --store "ssh-ng://$SSH_USER@$(current_ip)" --expr "$1")" || return 1
   tail -1 <<<"$out"
