@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-bats "$here/tests/"
-"$here/tests/persist.sh"
+exec bats "$(dirname "${BASH_SOURCE[0]}")/tests" "$@"
