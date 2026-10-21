@@ -22,12 +22,12 @@ teardown_file() {
 }
 
 @test "no Rosetta binfmt handler is registered" {
-  run r '[ ! -e /proc/sys/fs/binfmt_misc/rosetta ]'
+  run x '[ ! -e /proc/sys/fs/binfmt_misc/rosetta ]'
   assert_success
 }
 
 @test "the host still builds an aarch64-linux derivation on the builder over ssh-ng" {
   out="$(remote_build "$(probe_expr norosetta)")"
-  run r "cat $out"
+  run x "cat $out"
   assert_output ok
 }

@@ -66,15 +66,15 @@ probe() {
 
 @test "image A boots on a fresh volume" {
   boot "$REF_A"
-  put sysA "$(r 'readlink -f /run/booted-system')"
+  put sysA "$(x 'readlink -f /run/booted-system')"
 }
 
 @test "/nix is an overlay with its upper on the volume, and /nix/store stays read-only" {
-  run r 'findmnt -n -o FSTYPE /nix'
+  run x 'findmnt -n -o FSTYPE /nix'
   assert_output overlay
-  run r 'findmnt -n -o OPTIONS /nix'
+  run x 'findmnt -n -o OPTIONS /nix'
   assert_output --partial upperdir=/persist/upper
-  run r 'findmnt -n -o OPTIONS --direction backward --first-only /nix/store | tr , "\n"'
+  run x 'findmnt -n -o OPTIONS --direction backward --first-only /nix/store | tr , "\n"'
   assert_line ro
 }
 
@@ -82,23 +82,23 @@ probe() {
   run logs
   refute_output --partial 'STORE IS EPHEMERAL'
   assert_output --partial 'seeding the Nix DB'
-  run r 'cat /nix/var/nix/linux-builder-seeded-system'
+  run x 'cat /nix/var/nix/linux-builder-seeded-system'
   assert_output "$(get sysA)"
-  r '[ -s /persist/upper/var/nix/db/db.sqlite ]'
+  x '[ -s /persist/upper/var/nix/db/db.sqlite ]'
 }
 
 @test "outputs survive stop + restart" {
   out1="$(probe persist)"
   put out1 "$out1"
-  r "[ -e /persist/upper/store/${out1#/nix/store/} ]"
-  put hostKey "$(r 'ssh-keygen -lf /persist/ssh/ssh_host_ed25519_key.pub')"
+  x "[ -e /persist/upper/store/${out1#/nix/store/} ]"
+  put hostKey "$(x 'ssh-keygen -lf /persist/ssh/ssh_host_ed25519_key.pub')"
 
   stop
   boot "$REF_A"
 
   assert_clean_previous_shutdown
-  r "nix-store --check-validity $out1 && nix-store --verify-path $out1"
-  run r 'ssh-keygen -lf /persist/ssh/ssh_host_ed25519_key.pub'
+  x "nix-store --check-validity $out1 && nix-store --verify-path $out1"
+  run x 'ssh-keygen -lf /persist/ssh/ssh_host_ed25519_key.pub'
   assert_output "$(get hostKey)"
   run logs
   refute_output --partial 'seeding the Nix DB'
@@ -116,7 +116,7 @@ probe() {
   echo "$out2" >>"$BATS_FILE_TMPDIR/imported"
   assert_success
   refute_output --partial 'hash mismatch'
-  r "nix-store --verify-path $out2"
+  x "nix-store --verify-path $out2"
 }
 
 @test "the next boot flags a teardown that never reached the sync hook" {
@@ -133,25 +133,25 @@ probe() {
   boot "$REF_B"
 
   assert_clean_previous_shutdown
-  sysB="$(r 'readlink -f /run/booted-system')"
+  sysB="$(x 'readlink -f /run/booted-system')"
   assert_not_equal "$sysA" "$sysB"
   run logs
   assert_output --partial 'reconciling the persisted Nix DB'
-  run r 'cat /nix/var/nix/linux-builder-seeded-system'
+  run x 'cat /nix/var/nix/linux-builder-seeded-system'
   assert_output "$sysB"
-  r "[ ! -e $sysA ]"
-  run r "nix-store --check-validity $sysA"
+  x "[ ! -e $sysA ]"
+  run x "nix-store --check-validity $sysA"
   assert_failure
-  r 'nix-store --verify'
-  r "nix-store --check-validity $(get out1) $(get out2)"
+  x 'nix-store --verify'
+  x "nix-store --check-validity $(get out1) $(get out2)"
 }
 
 @test "GC keeps the baked closure, and the builder reboots cleanly after it" {
   garbage="$(probe garbage)"
-  r 'nix-collect-garbage -d' >/dev/null
-  r "[ ! -e $garbage ]"
-  r 'nix-store -qR /run/booted-system | while read -r p; do [ -e "$p" ] || { echo "missing $p"; exit 1; }; done'
-  r 'nix-store --verify --check-contents'
+  x 'nix-collect-garbage -d' >/dev/null
+  x "[ ! -e $garbage ]"
+  x 'nix-store -qR /run/booted-system | while read -r p; do [ -e "$p" ] || { echo "missing $p"; exit 1; }; done'
+  x 'nix-store --verify --check-contents'
   stop
   boot "$REF_B"
 }

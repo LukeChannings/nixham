@@ -56,6 +56,12 @@ current_ip() {
   cat "$BATS_FILE_TMPDIR/ip"
 }
 
+# Runs a command in the file's container as root, through the runtime: no ssh.
+x() {
+  container exec -e PATH=/run/wrappers/bin:/run/current-system/sw/bin \
+    "$(cat "$BATS_FILE_TMPDIR/name")" /run/current-system/sw/bin/bash -c "$*"
+}
+
 # Runs a command in the file's container as root. /usr/bin/ssh: only Apple's
 # binaries are granted the macOS Local Network privacy permission.
 r() {
@@ -63,7 +69,7 @@ r() {
 }
 
 # boot_container <name> <ref> [container run flags...]: a fresh container
-# (rm + run) whose sshd answers; records its IP for r.
+# (rm + run) whose sshd answers; records its name for x and its IP for r.
 boot_container() {
   local name=$1 ref=$2 addr
   shift 2
@@ -72,6 +78,7 @@ boot_container() {
     --kernel "$LBI_KERNEL" "$@" "$ref" >/dev/null
   addr="$(container_ip "$name")"
   [ -n "$addr" ] || fail "no IPv4 address for $name"
+  echo "$name" >"$BATS_FILE_TMPDIR/name"
   echo "$addr" >"$BATS_FILE_TMPDIR/ip"
   wait_for_port "$addr" 22 || fail "sshd never answered on $addr:22"
 }
@@ -79,11 +86,11 @@ boot_container() {
 # assert_no_failed_units [allowed-unit-regex]
 assert_no_failed_units() {
   local state failed
-  state="$(r 'systemctl is-system-running --wait' || true)"
-  failed="$(r 'systemctl --failed --plain --no-legend' | awk '{print $1}')"
+  state="$(x 'systemctl is-system-running --wait' || true)"
+  failed="$(x 'systemctl --failed --plain --no-legend' | awk '{print $1}')"
   if [ -n "${1:-}" ]; then failed="$(grep -vE "^($1)\$" <<<"$failed" || true)"; fi
   if [ -n "$failed" ]; then
-    r 'systemctl --failed --no-pager' >&2 || true
+    x 'systemctl --failed --no-pager' >&2 || true
     fail "failed units: $(echo $failed)"
   fi
   [ -n "${1:-}" ] || [ "$state" = running ] || fail "system state: $state"
