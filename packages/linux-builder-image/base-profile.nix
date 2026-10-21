@@ -126,7 +126,7 @@ in
     enable = true;
     startWhenNeeded = false;
     settings = {
-      PermitRootLogin = "prohibit-password";
+      PermitRootLogin = mkDefault "no";
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
       AcceptEnv = [ "NIX_*" ];

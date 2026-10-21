@@ -17,9 +17,14 @@ with_pkg() {
   echo "let pkg = (builtins.getFlake (toString $LBI_REPO)).packages.\${builtins.currentSystem}.linux-builder-image; in $1"
 }
 
+# key_module [user...]: authorizes the suite's key for the users (builder).
 key_module() {
-  local key="(builtins.readFile $BATS_SUITE_TMPDIR/key.pub)"
-  echo "{ users.users.root.openssh.authorizedKeys.keys = [ $key ]; users.users.builder.openssh.authorizedKeys.keys = [ $key ]; }"
+  local user
+  echo "{"
+  for user in "${@:-builder}"; do
+    echo "users.users.$user.openssh.authorizedKeys.keys = [ (builtins.readFile $BATS_SUITE_TMPDIR/key.pub) ];"
+  done
+  echo "}"
 }
 
 keyed_expr() {

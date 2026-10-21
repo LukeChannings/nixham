@@ -2,7 +2,7 @@ load helpers
 
 setup_file() {
   export CONTAINER=lbi-keyed
-  REF="$(build_and_load keyed "$(keyed_expr)")"
+  REF="$(build_and_load keyed "pkg.override { modules = [ $(key_module builder root) ]; }")"
   export REF
   boot_container "$REF" --rosetta
 }
@@ -15,9 +15,9 @@ x86() {
   echo "let pkgs = import (builtins.getFlake (toString $LBI_REPO)).inputs.nixpkgs { system = \"x86_64-linux\"; }; in"
 }
 
-@test "root logs in with the key provided via modules" {
+@test "root is refused despite a key provided via modules" {
   SSH_USER=root run r true
-  assert_success
+  assert_failure
 }
 
 @test "builder logs in with the key provided via modules" {
@@ -72,7 +72,7 @@ x86() {
 @test "sshd's effective config carries the scar tissue" {
   eff="$(x 'sshd -T')"
   for want in "maxstartups 100:30:200" "maxsessions 100" "persourcepenalties no" \
-    "acceptenv NIX_*" "permitrootlogin prohibit-password" \
+    "acceptenv NIX_*" "permitrootlogin no" \
     "passwordauthentication no" "kbdinteractiveauthentication no"; do
     run grep -ixF "$want" <<<"$eff"
     assert_success
