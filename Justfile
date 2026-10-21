@@ -18,7 +18,7 @@ check:
 alias lint := check
 
 # Live suites: they need macOS, apple/container and the host's builder;
-# nix flake check cannot run them (see the tests' README).
+# nix flake check cannot run them.
 
 # Run the test suite
 test:

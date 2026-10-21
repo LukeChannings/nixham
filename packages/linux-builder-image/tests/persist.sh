@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Live probe of the persistent store volume (packages/linux-builder-image/
-# persistent-store.nix). See README.md.
+# persistent-store.nix).
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
