@@ -20,10 +20,30 @@ alias lint := check
 # Live suites: they need macOS, apple/container and the host's builder;
 # nix flake check cannot run them.
 
-# Run the test suite
-test:
-    packages/linux-builder-image/tests/run.sh
-    packages/linux-builder-image/tests/persist.sh
+# Run every test.sh in the repo, or only those whose directory is named NAMES
+test *NAMES:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    names=({{ NAMES }})
+    mapfile -t all < <(find . \( -name .git -o -name .worktree -o -name 'result*' \) -prune -o -name test.sh -print | sort)
+    suites=()
+    if [ ${#names[@]} -eq 0 ]; then
+      suites=("${all[@]}")
+    else
+      for name in "${names[@]}"; do
+        found=0
+        for s in "${all[@]}"; do
+          if [ "$(basename "$(dirname "$s")")" = "$name" ]; then suites+=("$s"); found=1; fi
+        done
+        [ "$found" = 1 ] || { echo "no test.sh in a directory named '$name'" >&2; exit 1; }
+      done
+    fi
+    status=0
+    for s in "${suites[@]}"; do
+      echo "=== $s ===" >&2
+      "$s" || status=1
+    done
+    exit "$status"
 
 # Build all packages
 build:
