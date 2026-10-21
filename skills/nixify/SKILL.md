@@ -11,11 +11,11 @@ Templates are bundled under [`templates/`](templates/) (resolve relative to this
 
 **Core convention — flakes for inputs, vanilla nix for everything else.** The flake exists to pin inputs (`flake.lock`); day-to-day building and running goes through the flake-compat shim with `nix-build` / `nix-shell`, never `nix build` / `nix develop` / `nix flake check`. Flake commands copy the entire source tree to the store on every invocation, which is very expensive; `default.nix` sets `copySourceTreeToStore = false` to avoid exactly that. `.envrc` uses `use_nix` (not `use flake`) for the same reason. `nix flake lock` is fine — it only manages the lock file.
 
-**Common operations are standardised with [`just`](https://just.systems/man/).** `just` is a standard dependency in every devShell, and a `Justfile` provides stable recipe names wrapping the appropriate commands: `check` (alias `lint`), `build`, `run` (alias `start`), `format` (alias `fmt`), and `test`. When the project distinguishes unit from integration tests, add `test-unit` and `test-integration`, with `test` running both.
+**Common operations are standardised with [`just`](https://just.systems/man/).** `just` is a standard dependency in every devShell, and a `Justfile` provides stable recipe names wrapping the appropriate commands: `check` (alias `lint`), `build`, `run` (alias `start`), `format` (alias `fmt`), and `test`. When the project distinguishes unit from integration tests, add `test-unit` and `test-integration`, with `test` running both. Every recipe is discretionary: the names are standard, not their presence. Keep only those the project has a use for (no `run` when nothing is runnable, no `build` without packages), and drop the matching Zed task and CI workflow with them.
 
 Two meta recipes ride along: `worktree <issue> <slug>` creates a git worktree under `.worktree/<issue>-<slug>/` on a matching branch and primes it via `init-worktree`. `init-worktree` is the single entry point for priming any new worktree/checkout: it copies `.env` from the main worktree (gitignored, so absent otherwise), then runs `direnv allow` + `direnv reload`.
 
-`.zed/tasks.json` maps the core recipes to Title-case task labels — `Build` → `just build`, `Check`, `Format`, `Test`, `Run` — never `just <recipe>` labels (those collide with the tasks Zed's `just` extension generates, duplicating every picker entry). Meta/parameterised recipes (`default`, `worktree`, `init-worktree`) are not mapped. The file also carries a [`create_worktree` hook](https://zed.dev/docs/tasks#hooks) running `just init-worktree $ZED_WORKTREE_ROOT`, so Zed-created worktrees are primed automatically.
+`.zed/tasks.json` maps whichever core recipes exist to Title-case task labels — `Build` → `just build`, `Check`, `Format`, `Test`, `Run` — never `just <recipe>` labels (those collide with the tasks Zed's `just` extension generates, duplicating every picker entry). Meta/parameterised recipes (`default`, `worktree`, `init-worktree`) are not mapped. The file also carries a [`create_worktree` hook](https://zed.dev/docs/tasks#hooks) running `just init-worktree $ZED_WORKTREE_ROOT`, so Zed-created worktrees are primed automatically.
 
 ## Decide which scenario applies
 
@@ -44,9 +44,9 @@ Start from Scenario 1b, then:
 1. Detect the ecosystem (package.json, Cargo.toml, go.mod, pyproject.toml, *.cabal, etc.).
 2. Follow [ECOSYSTEMS.md](ECOSYSTEMS.md) for the builder, devshell toolchain, and formatter for that ecosystem (JS/TS → buildNpmPackage + biome, Rust → crane, Python → nixpkgs python devshell + pyproject.nix, Go → buildGoModule). The packaging rule is **colocation**: a derivation that packages an in-repo source tree lives with that tree, as a `package.nix` at its root (repo root for a single-package repo), wired in `flake.nix` with `pkgs.callPackage ./path/to/package.nix { }` — never inlined in `flake.nix`. A central `packages/` directory is for everything else: vendored out-of-repo software and packages implemented entirely within it (`packages/<foo>/package.nix` whose source *is* there is fine; `packages/foo.nix` reaching into `../some/dir` is not). Set `packages.default`.
 3. Extend `treefmt.nix` with formatters already used by the project — consult the treefmt-nix repo for available programs; don't introduce new formatters uninvited beyond the nix-base set.
-4. Fill in the `Justfile`: set the binary name in `run`, wire `test` to the project's test runner (splitting into `test-unit`/`test-integration` if the suite distinguishes them, with `test` running both), and adapt recipe bodies to the ecosystem's native commands where that's the better dev loop (e.g. `cargo build`) — but keep the recipe names stable.
+4. Fill in the `Justfile`: drop recipes the project has no use for, set the binary name in `run`, wire `test` to the project's test runner (splitting into `test-unit`/`test-integration` if the suite distinguishes them, with `test` running both), and adapt recipe bodies to the ecosystem's native commands where that's the better dev loop (e.g. `cargo build`) — but keep the recipe names stable.
 5. If the package is a daemon/service, offer an accompanying NixOS or nix-darwin module (pattern in [ECOSYSTEMS.md](ECOSYSTEMS.md)).
-6. Verify: `just build`, `just check`, `just test`, and `nix-shell --run '<toolchain> --version'`.
+6. Verify: every recipe kept (`just build`, `just check`, `just test`, …) and `nix-shell --run '<toolchain> --version'`.
 
 ## Scenario 3: Existing nix config
 
@@ -54,7 +54,7 @@ Audit the repo's config against nix-base conventions and converge. Full checklis
 
 ## CI workflows
 
-Every flake repo (scenarios 1b, 2, 3) gets Lint, Test, and Build workflows from [`templates/ci/`](templates/ci/). Read them before acting.
+Every flake repo (scenarios 1b, 2, 3) gets Lint, Test, and Build workflows from [`templates/ci/`](templates/ci/), each only if what it wraps exists: drop `lint.yaml` without a `check` recipe, `test.yaml` without `test`. Read them before acting.
 
 1. Find the host from `git remote get-url origin`: `forge.channings.me` → Forgejo, `github.com` → GitHub. No remote, or another host → ask.
 2. Forgejo repo → ask whether it's mirrored to GitHub. If so, add both sets: Forgejo ignores `.github/workflows` when `.forgejo/workflows` exists, so nothing runs twice on the forge.
@@ -75,7 +75,7 @@ The workflows run on pushes to `main` and on PRs:
 Vanilla commands only — see the core convention above.
 
 - [ ] `nix-shell --run true` works (proves the flake-compat path)
-- [ ] `just check` passes and `just build` builds (if packages exist)
+- [ ] Every recipe kept in the `Justfile` succeeds
 - [ ] `direnv allow` succeeds and loads the shell
 - [ ] nix files are git-tracked (if repo)
 - [ ] `just check` lints the workflows (actionlint, yamllint, forgejo-schema) — no separate linter runs needed
