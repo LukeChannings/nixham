@@ -177,6 +177,19 @@ in
   # /dev/console is the terminal of `container run -it`, where the container
   # profile's console-getty runs: log straight in as root there.
   services.getty.autologinUser = "root";
+  # /dev/console is a bind-mounted pts, yet systemd resolves TTYPath=
+  # /dev/console to the kernel console (hvc0) and makes that the session's
+  # controlling tty, denying it to agetty and the shell's job control.
+  # Without a tty for systemd, agetty acquires /dev/console itself.
+  # Leaving the shell ends the container rather than logging in again.
+  systemd.services.console-getty = {
+    serviceConfig = {
+      StandardInput = "null";
+      StandardOutput = "journal";
+      Restart = mkForce "no";
+    };
+    unitConfig.SuccessAction = "poweroff";
+  };
 
   security.pam.services.sshd.startSession = mkForce false;
 
@@ -232,8 +245,13 @@ in
   # As nixpkgs' profiles/nix-builder.nix, the Darwin builder VM.
   users.users.builder.isNormalUser = true;
 
-  # After ./persistent-store.nix's mkBefore: its seeding never sees this.
+  # The VM's devtmpfs has virtual consoles, which no container has: without
+  # /dev/tty0, systemd neither starts getty@tty1 nor asks for kbrequest
+  # signals, which needs the CAP_SYS_TTY_CONFIG it lacks.
+  # After ./persistent-store.nix's mkBefore: its seeding never sees
+  # runtimeConfig.
   boot.postBootCommands = ''
+    rm -f /dev/tty0
     ${runtimeConfig}
   '';
 

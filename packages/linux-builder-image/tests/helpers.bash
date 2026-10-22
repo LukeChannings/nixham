@@ -34,6 +34,35 @@ build_and_load() {
   echo "$ref"
 }
 
+# The console a test runs under `script -F "$BATS_FILE_TMPDIR/console.log"`.
+console() {
+  tr -d '\r' 2>/dev/null <"$BATS_FILE_TMPDIR/console.log"
+}
+
+# wait_for_console <regex>: until the console log matches, or 90s pass.
+wait_for_console() {
+  local deadline=$((SECONDS + 90))
+  until console | grep -Eq "$1"; do
+    [ "$SECONDS" -lt "$deadline" ] || fail "no '$1' on the console, which ends: $(console | tail -5)"
+    sleep 0.2
+  done
+}
+
+# For teardown: ends a test's CONSOLE coprocess which, as any background job,
+# ignores ^C, and would keep bats from exiting until its container stops.
+stop_console() {
+  [ -z "${CONSOLE_PID:-}" ] || kill "$CONSOLE_PID" 2>/dev/null || true
+}
+
+# wait_for_exit <pid>: until the child <pid> exits, or fails after 60s.
+wait_for_exit() {
+  local deadline=$((SECONDS + 60))
+  while kill -0 "$1" 2>/dev/null; do
+    [ "$SECONDS" -lt "$deadline" ] || return 1
+    sleep 0.2
+  done
+}
+
 container_ip() {
   container inspect "$1" | jq -r '.[0].status.networks[0].ipv4Address // empty' | cut -d/ -f1
 }
