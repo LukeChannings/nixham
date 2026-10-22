@@ -30,6 +30,9 @@
           apple-container-kernel = pkgs.callPackage ./packages/apple-container-kernel/package.nix {
             inherit (pkgs) path;
           };
+          linux-builder = pkgs.callPackage ./packages/linux-builder/package.nix {
+            nixham = self;
+          };
           linux-builder-image = pkgs.callPackage ./packages/linux-builder-image/package.nix {
             inherit (pkgs) path;
             inherit nix2container;

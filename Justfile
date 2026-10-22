@@ -51,7 +51,18 @@ test *NAMES:
 
 # Build all packages
 build:
-    nix-build -A skill-nixify -A apple-container-kernel -A linux-builder-image
+    nix-build -A skill-nixify -A apple-container-kernel -A linux-builder -A linux-builder-image
+
+# Run the package NAME's program of the same name with ARGS, e.g. `just run linux-builder shell`
+[positional-arguments]
+run NAME *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # nix-build writes every .drv of the closure through the daemon even when
+    # the output is cached (~15s for linux-builder); evaluating is enough then.
+    out="$(nix-instantiate --eval --raw -A "$1.outPath")"
+    nix-store --check-validity "$out" 2>/dev/null || nix-build --no-out-link -A "$1" >/dev/null
+    exec "$out/bin/$1" "${@:2}"
 
 # Create a worktree at .worktree/<issue>-<slug> on a matching branch, then prime it
 worktree issue slug:
