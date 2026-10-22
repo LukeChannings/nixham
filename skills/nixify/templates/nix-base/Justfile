@@ -35,10 +35,10 @@ run *ARGS: build
 
 alias start := run
 
-# Create a worktree at .worktree/<issue>-<slug> on a matching branch, then prime it
+# Create a worktree at .worktrees/<issue>-<slug> on a matching branch, then prime it
 worktree issue slug:
-    git worktree add .worktree/{{ issue }}-{{ slug }} -b {{ issue }}-{{ slug }}
-    just init-worktree .worktree/{{ issue }}-{{ slug }}
+    git worktree add .worktrees/{{ issue }}-{{ slug }} -b {{ issue }}-{{ slug }}
+    just init-worktree .worktrees/{{ issue }}-{{ slug }}
 
 # Copies .env from the main worktree (gitignored, so absent in fresh
 # worktrees), then direnv allow + reload. Zed runs this automatically via

@@ -29,7 +29,7 @@ test *NAMES:
     names=() args=()
     while [ $# -gt 0 ] && [ "$1" != -- ]; do names+=("$1"); shift; done
     [ $# -eq 0 ] || { shift; args=(--allow-empty-suite "$@"); }
-    mapfile -t all < <(find . \( -name .git -o -name .worktree -o -name 'result*' \) -prune -o -name test.sh -print | sort)
+    mapfile -t all < <(find . \( -name .git -o -name .worktrees -o -name 'result*' \) -prune -o -name test.sh -print | sort)
     suites=()
     if [ ${#names[@]} -eq 0 ]; then
       suites=("${all[@]}")
@@ -66,10 +66,10 @@ run NAME *ARGS:
     nix-store --check-validity "$out" 2>/dev/null || nix-build --no-out-link -A "$1" >/dev/null
     exec "$out/bin/$1" "${@:2}"
 
-# Create a worktree at .worktree/<issue>-<slug> on a matching branch, then prime it
+# Create a worktree at .worktrees/<issue>-<slug> on a matching branch, then prime it
 worktree issue slug:
-    git worktree add .worktree/{{ issue }}-{{ slug }} -b {{ issue }}-{{ slug }}
-    just init-worktree .worktree/{{ issue }}-{{ slug }}
+    git worktree add .worktrees/{{ issue }}-{{ slug }} -b {{ issue }}-{{ slug }}
+    just init-worktree .worktrees/{{ issue }}-{{ slug }}
 
 # Copies .env from the main worktree (gitignored, so absent in fresh
 # worktrees), then direnv allow + reload. Zed runs this automatically via

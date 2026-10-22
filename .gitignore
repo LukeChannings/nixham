@@ -2,4 +2,4 @@ result
 result-*
 .direnv/
 .env
-.worktree/
+.worktrees/
