@@ -42,6 +42,8 @@ test *NAMES:
         [ "$found" = 1 ] || { echo "no test.sh in a directory named '$name'" >&2; exit 1; }
       done
     fi
+    # bats exits 1 when interrupted, so without this ^C moves on to the next suite.
+    trap 'exit 130' INT
     status=0
     for s in "${suites[@]}"; do
       echo "=== $s ===" >&2
