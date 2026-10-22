@@ -174,6 +174,10 @@ in
 
   systemd.services.nix-daemon.wantedBy = [ "multi-user.target" ];
 
+  # /dev/console is the terminal of `container run -it`, where the container
+  # profile's console-getty runs: log straight in as root there.
+  services.getty.autologinUser = "root";
+
   security.pam.services.sshd.startSession = mkForce false;
 
   # Runs only while ${hostKey} links to nothing, i.e. to a persisted key yet
