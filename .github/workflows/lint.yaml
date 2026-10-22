@@ -23,5 +23,6 @@ jobs:
         with:
           determinate: false
       - uses: ./.forgejo/actions/substituter
+      - uses: ./.forgejo/actions/setup-nix-shell
       - name: Lint
-        run: nix-shell --run 'just check'
+        run: just check

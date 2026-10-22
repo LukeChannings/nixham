@@ -19,5 +19,7 @@ jobs:
         run: >-
           git clone --depth 1 -b "${HEAD_REF:-$REF_NAME}"
           "https://$TOKEN@forge.channings.me/$GITHUB_REPOSITORY.git" .
+      # yamllint disable-line rule:line-length
+      - uses: https://forge.channings.me/hartlandia/nixham/.forgejo/actions/setup-nix-shell@main
       - name: Test
-        run: nix-shell --run 'just test'
+        run: just test

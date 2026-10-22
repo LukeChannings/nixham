@@ -23,5 +23,6 @@ jobs:
         with:
           determinate: false
       - uses: ./.forgejo/actions/substituter
+      - uses: ./.forgejo/actions/setup-nix-shell
       - name: Test
-        run: nix-shell --run 'just test'
+        run: just test
