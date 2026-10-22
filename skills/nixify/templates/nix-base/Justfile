@@ -25,9 +25,13 @@ alias lint := check
 test:
     @echo 'CHANGEME: wire up the test runner' >&2; exit 1
 
-# Build the default package
-build:
-    nix-build -A default
+# Build package ATTR, or the default package
+build attr="default":
+    nix-build -A {{ attr }}
+
+# Build every package for this system
+build-all:
+    nix-build -E 'builtins.getAttr builtins.currentSystem (import ./. { }).packages'
 
 # Run the default package (set the binary name once packages.default exists)
 run *ARGS: build

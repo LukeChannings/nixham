@@ -51,9 +51,13 @@ test *NAMES:
     done
     exit "$status"
 
-# Build all packages
-build:
-    nix-build -A skill-nixify -A apple-container-kernel -A linux-builder -A linux-builder-image
+# Build package NAME, e.g. `just build linux-builder`
+build NAME:
+    nix-build -A {{ NAME }}
+
+# Build every package for this system
+build-all:
+    nix-build -E 'builtins.getAttr builtins.currentSystem (import ./. { }).packages'
 
 # Run the package NAME's program of the same name with ARGS, e.g. `just run linux-builder shell`
 [positional-arguments]

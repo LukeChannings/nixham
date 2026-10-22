@@ -2,7 +2,7 @@
 
 How to fill in `packages`, `devShells.default`, and `treefmt.nix` once you've detected the project's language. Consult [treefmt-nix](https://github.com/numtide/treefmt-nix) (`programs/` directory) for the full list of available formatter modules before wiring any formatter.
 
-Every devShell below also carries `just` (standard dependency), and the `Justfile`'s `build`/`run`/`check`/`test` recipes should wrap the ecosystem's native commands where that makes the better dev loop — recipe names stay stable across projects.
+Every devShell below also carries `just` (standard dependency), and the `Justfile`'s `run`/`check`/`test` recipes should wrap the ecosystem's native commands where that makes the better dev loop — recipe names stay stable across projects.
 
 ## JavaScript / TypeScript
 

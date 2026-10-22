@@ -1,5 +1,5 @@
 [
-  { "label": "Build", "command": "just", "args": ["build"] },
+  { "label": "Build", "command": "just", "args": ["build-all"] },
   { "label": "Check", "command": "just", "args": ["check"] },
   { "label": "Format", "command": "just", "args": ["format"] },
   { "label": "Test", "command": "just", "args": ["test"] },

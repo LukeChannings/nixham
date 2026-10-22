@@ -23,10 +23,9 @@ jobs:
         with:
           determinate: false
       - uses: ./.forgejo/actions/substituter
+      - uses: ./.forgejo/actions/setup-nix-shell
       - name: Build
-        run: >-
-          nix-build -E
-          'builtins.getAttr builtins.currentSystem (import ./. { }).packages'
+        run: just build-all
       # Fork PRs get no secrets.
       - name: Push to nix.channings.me
         if: >-
