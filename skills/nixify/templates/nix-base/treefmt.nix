@@ -11,6 +11,10 @@
   programs.shfmt.enable = true;
   programs.yamllint.enable = true;
   programs.actionlint.enable = true;
+  settings.formatter.actionlint.options = [
+    "-config-file"
+    ".forgejo/actionlint.yaml"
+  ];
 
   settings.formatter.forgejo-schema = {
     command = lib.getExe (

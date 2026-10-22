@@ -5,3 +5,7 @@ self-hosted-runner:
     - nixos-latest-x86_64
     - nixos-latest-arm64
     - macos-arm64
+paths:
+  .forgejo/workflows/*.yaml:
+    ignore:
+      - 'specifying action "https://.+" in invalid format'

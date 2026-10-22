@@ -59,7 +59,7 @@ Every flake repo (scenarios 1b, 2, 3) gets Lint, Test, and Build workflows from 
 1. Find the host from `git remote get-url origin`: `forge.channings.me` → Forgejo, `github.com` → GitHub. No remote, or another host → ask.
 2. Forgejo repo → ask whether it's mirrored to GitHub. If so, add both sets: Forgejo ignores `.github/workflows` when `.forgejo/workflows` exists, so nothing runs twice on the forge.
 3. Copy `ci/forgejo/*.yaml` → `.forgejo/workflows/`, `ci/github/*.yaml` → `.github/workflows/`.
-4. Forgejo workflows → copy `ci/actionlint.yaml` → `.github/actionlint.yaml`: actionlint also lints `.forgejo/workflows/` and rejects the Forgejo runner labels otherwise. GitHub-only repo → delete the `forgejo-schema` formatter from `treefmt.nix`.
+4. Forgejo workflows → copy `ci/actionlint.yaml` → `.forgejo/actionlint.yaml`. It declares the Forgejo runner labels and ignores actionlint's `invalid format` error for full-URL `uses: https://…` actions, which Forgejo needs and actionlint can't parse. `treefmt.nix` passes it with `-config-file`, because actionlint only discovers a config by itself when `.github/workflows/` exists. GitHub-only repo → delete the `forgejo-schema` formatter and the `actionlint.options` from `treefmt.nix`.
 
 The workflows run on pushes to `main` and on PRs, each inside the repo's devshell (`devShells.ci`, else `devShells.default`), loaded once per job by nixham's [`setup-nix-shell`](https://forge.channings.me/hartlandia/nixham/src/branch/main/.forgejo/actions/setup-nix-shell) action:
 
