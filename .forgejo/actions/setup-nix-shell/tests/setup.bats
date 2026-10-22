@@ -15,22 +15,78 @@ EOF
   export GITHUB_ENV="$BATS_TEST_TMPDIR/github_env"
   : >"$GITHUB_ENV"
 
-  # The real print-dev-env --json shape: PATH among other exported variables,
-  # some multi-line.
+  # The real print-dev-env --json shape: exported variables (some multi-line,
+  # some sandbox-only), plus unexported shell variables and arrays.
   export RESPONSE='{"bashFunctions":{},"variables":{
     "PATH":{"type":"exported","value":"/nix/store/aaa-just/bin:/nix/store/bbb-jq/bin"},
+    "NIX_LDFLAGS":{"type":"exported","value":" -L/nix/store/ccc-libiconv/lib"},
     "shellHook":{"type":"exported","value":"line one\nline two"},
-    "HOME":{"type":"exported","value":"/homeless-shelter"}}}'
+    "HOME":{"type":"exported","value":"/homeless-shelter"},
+    "TMPDIR":{"type":"exported","value":"/build"},
+    "phase":{"type":"var","value":"buildPhase"},
+    "outputs":{"type":"array","value":["out"]}}}'
 
   setup_sh="$BATS_TEST_DIRNAME/../setup.sh"
 }
 
-@test "prepends the devshell PATH to the job PATH via GITHUB_ENV" {
+# Reads NAME back out of $GITHUB_ENV, as the runner parses it: NAME=VALUE
+# lines and NAME<<DELIMITER heredocs.
+github_env() {
+  local line key delim value
+  while IFS= read -r line; do
+    if [[ $line == *'<<'* ]]; then
+      key=${line%%<<*} delim=${line#*<<} value=
+      while IFS= read -r line && [ "$line" != "$delim" ]; do
+        value+=${value:+$'\n'}$line
+      done
+    else
+      key=${line%%=*} value=${line#*=}
+    fi
+    [ "$key" != "$1" ] || { printf '%s' "$value"; return; }
+  done <"$GITHUB_ENV"
+  return 1
+}
+
+@test "prepends the devshell PATH to the job PATH" {
   run bash "$setup_sh"
 
   assert_success
-  assert_equal "$(cat "$GITHUB_ENV")" \
-    "PATH=/nix/store/aaa-just/bin:/nix/store/bbb-jq/bin:$PATH"
+  assert_equal "$(github_env PATH)" \
+    "/nix/store/aaa-just/bin:/nix/store/bbb-jq/bin:$PATH"
+}
+
+@test "exports the rest of the devshell environment" {
+  run bash "$setup_sh"
+
+  assert_success
+  assert_equal "$(github_env NIX_LDFLAGS)" " -L/nix/store/ccc-libiconv/lib"
+}
+
+@test "keeps multi-line values intact" {
+  run bash "$setup_sh"
+
+  assert_success
+  assert_equal "$(github_env shellHook)" $'line one\nline two'
+}
+
+@test "skips the sandbox variables nix develop ignores" {
+  run bash "$setup_sh"
+
+  assert_success
+  run github_env HOME
+  assert_failure
+  run github_env TMPDIR
+  assert_failure
+}
+
+@test "skips unexported shell variables and arrays" {
+  run bash "$setup_sh"
+
+  assert_success
+  run github_env phase
+  assert_failure
+  run github_env outputs
+  assert_failure
 }
 
 @test "materialises devShells.ci, falling back to devShells.default" {

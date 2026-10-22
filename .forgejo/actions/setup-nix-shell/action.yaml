@@ -3,14 +3,15 @@ name: Setup nix shell
 description: >-
   Run the repo's devshell in every later step of the job, with no `nix-shell
   --run` wrapper: materialises devShells.ci (or devShells.default) once with
-  nix print-dev-env and prepends its PATH via GITHUB_ENV. Needs Nix, jq, and a
+  nix print-dev-env and exports its environment via GITHUB_ENV, as nix develop
+  would: PATH prepended, sandbox-only variables skipped. Needs Nix, jq, and a
   flake-compat default.nix in the checkout; fails the job if the shell does
   not materialise.
 
 runs:
   using: composite
   steps:
-    - name: Load the devshell PATH
+    - name: Load the devshell environment
       shell: bash
       env:
         action_path: ${{ github.action_path }}
