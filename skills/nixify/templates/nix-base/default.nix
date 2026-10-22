@@ -3,7 +3,7 @@ let
   lockFile = builtins.fromJSON (builtins.readFile ./flake.lock);
   flake-compat-node = lockFile.nodes.${lockFile.nodes.root.inputs.flake-compat};
   flake-compat = fetchGit {
-    inherit (flake-compat-node.locked) url rev;
+    inherit (flake-compat-node.locked) url rev narHash;
   };
 
   flake = import flake-compat {
