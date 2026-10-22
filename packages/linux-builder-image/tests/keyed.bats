@@ -16,7 +16,7 @@ teardown_file() {
 }
 
 x86() {
-  echo "let pkgs = import (builtins.getFlake (toString $LBI_REPO)).inputs.nixpkgs { system = \"x86_64-linux\"; }; in"
+  echo "let pkgs = import (import $LBI_REPO { }).inputs.nixpkgs { system = \"x86_64-linux\"; }; in"
 }
 
 @test "root is refused despite a key provided via modules" {

@@ -2,8 +2,7 @@
 setup_suite() {
   LBI_REPO="$(cd "$BATS_TEST_DIRNAME/../../.." && pwd)"
   # This tree's kernel, whose CONFIG_EROFS_FS the image's /etc overlay needs.
-  LBI_KERNEL="$(nix-build --fallback --no-out-link -E \
-    "(builtins.getFlake (toString $LBI_REPO)).packages.\${builtins.currentSystem}.apple-container-kernel")/vmlinux-arm64"
+  LBI_KERNEL="$(nix-build --fallback --no-out-link -A apple-container-kernel "$LBI_REPO")/vmlinux-arm64"
   export LBI_REPO LBI_KERNEL
 
   # One key for every file, and boot_keyed's /config authorizing it.

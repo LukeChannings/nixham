@@ -15,7 +15,7 @@ SSHO=(-o IdentitiesOnly=yes -o IdentityAgent=none
 
 # Expressions are evaluated with `pkg` bound to the linux-builder-image package.
 with_pkg() {
-  echo "let pkg = (builtins.getFlake (toString $LBI_REPO)).packages.\${builtins.currentSystem}.linux-builder-image; in $1"
+  echo "let pkg = (import $LBI_REPO { }).linux-builder-image; in $1"
 }
 
 # build_and_load <label> <expr>: loads the image into the runtime, prints its
@@ -26,10 +26,9 @@ build_and_load() {
   local ref status=0
   nix-build --fallback -o "$BATS_FILE_TMPDIR/$1.tar" -E "$(with_pkg "$2")" >/dev/null || return
   until mkdir "$BATS_RUN_TMPDIR/image-load.lock" 2>/dev/null; do sleep 0.1; done
-  container image load -i "$BATS_FILE_TMPDIR/$1.tar" >/dev/null || status=$?
+  ref="$(container image load -i "$BATS_FILE_TMPDIR/$1.tar")" || status=$?
   rmdir "$BATS_RUN_TMPDIR/image-load.lock"
   [ "$status" = 0 ] || return "$status"
-  ref="$(nix-instantiate --eval --raw -E "$(with_pkg "($2).imageRef")")"
   echo "$ref" >>"$BATS_RUN_TMPDIR/images"
   echo "$ref"
 }
