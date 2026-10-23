@@ -10,6 +10,7 @@ Nixham hosts many unrelated components (nix-darwin modules, NixOS modules, home-
 - [linux-builder](./modules/nix-darwin/nix/linux-builder/CONTEXT.md) — a Linux Nix builder for macOS hosts, built on oci-containers. Spans `packages/linux-builder-image` (the image), `packages/linux-builder` (the ephemeral CLI), and `modules/nix-darwin/nix/linux-builder` (the resident nix-darwin module).
 - [launchd](./modules/nix-darwin/launchd/CONTEXT.md) — extensions of nix-darwin's launchd jobs: daemons that wait for a late-mounting store, and their logs.
 - [pki-keychain](./modules/nix-darwin/security/pki-keychain/CONTEXT.md) — CA certificates trusted in the macOS System keychain, as well as nix-darwin's OpenSSL bundle.
+- [virtual-interfaces](./modules/nix-darwin/networking/virtual-interfaces/CONTEXT.md) — per-service network interfaces, each with its own MAC address and lease on a tagged VLAN.
 
 ## Relationships
 
@@ -18,3 +19,4 @@ Nixham hosts many unrelated components (nix-darwin modules, NixOS modules, home-
 - **apple-container ↔ the `container` CLI**: `virtualisation.apple-container.*` mirrors the runtime's own command tree (`system.dns`, `system.kernel`, `network`, …) rather than inventing a Nix-side taxonomy.
 - **apple-container ← apple-container-kernel**: the runtime boots guest VMs with a kernel; `packages/apple-container-kernel` provides one with `CONFIG_KVM` and `CONFIG_EROFS_FS`, which the linux-builder requires.
 - **oci-containers → launchd**: an on-demand container's proxy daemons are inetd-style, so launchd executes them straight from the store: they opt out of launchd's ADR-0001.
+- **virtual-interfaces → launchd**: its daemon is the one sanctioned exception to launchd's ADR-0001: it plumbs the legs from a root-volume script, before /nix mounts.

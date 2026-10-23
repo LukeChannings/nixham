@@ -17,6 +17,7 @@ rec {
   linux-builder = module "linux-builder" ./nix/linux-builder [ oci-containers ];
   launchd-logging = module "launchd-logging" ./launchd/logging [ ];
   launchd-wait4path = module "launchd-wait4path" ./launchd/wait4path [ ];
+  virtual-interfaces = module "virtual-interfaces" ./networking/virtual-interfaces [ ];
   pki-keychain = module "pki-keychain" ./security/pki-keychain [ ];
   zsh = module "zsh" ./programs/zsh [ ];
   default.imports = [
@@ -24,6 +25,7 @@ rec {
     launchd-wait4path
     linux-builder
     pki-keychain
+    virtual-interfaces
     zsh
   ];
 }

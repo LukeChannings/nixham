@@ -6,6 +6,7 @@
 
 - [launchd.\*.waitForPaths](nix-darwin/launchd-wait4path.md)
 - [launchd.logging](nix-darwin/launchd-logging.md)
+- [networking.virtualInterfaces](nix-darwin/virtual-interfaces.md)
 - [nix.linux-builder](nix-darwin/linux-builder.md)
 - [programs.zsh](nix-darwin/zsh.md)
 - [security.pki.keychainCertificates](nix-darwin/pki-keychain.md)
