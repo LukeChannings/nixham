@@ -8,7 +8,7 @@ format:
 
 alias fmt := format
 
-# The flake's checks.formatting output exists for CI, where a store copy
+# The flake's checks.treefmt output exists for CI, where a store copy
 # is acceptable; day to day, check the live tree instead.
 
 # Check the working tree directly (no store copy)

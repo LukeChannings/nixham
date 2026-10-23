@@ -1,7 +1,8 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     flake-compat.url = "git+https://git.lix.systems/lix-project/flake-compat";
     flake-compat.flake = false;
     treefmt-nix.url = "github:numtide/treefmt-nix";
@@ -9,33 +10,30 @@
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-      treefmt-nix,
-      ...
-    }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        pkgs = import nixpkgs { inherit system; };
+    inputs@{ flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [ inputs.treefmt-nix.flakeModule ];
 
-        treefmt = treefmt-nix.lib.evalModule pkgs ./treefmt.nix;
-      in
-      {
-        packages = { };
+      systems = [
+        "aarch64-darwin"
+        "aarch64-linux"
+        "x86_64-darwin"
+        "x86_64-linux"
+      ];
 
-        formatter = treefmt.config.build.wrapper;
+      perSystem =
+        { config, pkgs, ... }:
+        {
+          packages = { };
 
-        checks.formatting = treefmt.config.build.check self;
+          treefmt = ./treefmt.nix;
 
-        devShells.default = pkgs.mkShell {
-          packages = [
-            pkgs.just
-            treefmt.config.build.wrapper
-          ];
+          devShells.default = pkgs.mkShell {
+            packages = [
+              pkgs.just
+              config.treefmt.build.wrapper
+            ];
+          };
         };
-      }
-    );
+    };
 }

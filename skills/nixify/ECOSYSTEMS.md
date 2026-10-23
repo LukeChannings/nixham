@@ -40,12 +40,15 @@ nix/modules/
 └── nix-darwin.nix   # launchd service, imports options.nix
 ```
 
-Projects exporting modules (or configurations) use **flake-parts**, specifically its [`modules` flake module](https://flake.parts/options/flake-parts-modules.html): import `flake-parts.flakeModules.modules` and declare under `flake.modules.<class>.<name>` — flake-parts then exposes them as the conventional flake outputs (`nixosModules`, `darwinModules`, and likewise `nixosConfigurations`/`darwinConfigurations`):
+Export modules (or configurations) through flake-parts' [`modules` flake module](https://flake.parts/options/flake-parts-modules.html): add `flake-parts.flakeModules.modules` to nix-base's `imports` and declare under `flake.modules.<class>.<name>` — flake-parts then exposes them as the conventional flake outputs (`nixosModules`, `darwinModules`, and likewise `nixosConfigurations`/`darwinConfigurations`):
 
 ```nix
 outputs = inputs@{ flake-parts, ... }:
   flake-parts.lib.mkFlake { inherit inputs; } {
-    imports = [ inputs.flake-parts.flakeModules.modules ];
+    imports = [
+      inputs.flake-parts.flakeModules.modules
+      inputs.treefmt-nix.flakeModule
+    ];
 
     flake.modules.nixos.default = ./nix/modules/nixos.nix;
     flake.modules.darwin.default = ./nix/modules/nix-darwin.nix;
@@ -55,4 +58,8 @@ outputs = inputs@{ flake-parts, ... }:
   };
 ```
 
-If the project started from nix-base's flake-utils layout, this is the point to restructure onto flake-parts (treefmt-nix ships a `flakeModule` that slots into `perSystem.treefmt`). Ask the user whether they deploy via NixOS, nix-darwin, or both before writing modules — don't scaffold both speculatively.
+Ask the user whether they deploy via NixOS, nix-darwin, or both before writing modules — don't scaffold both speculatively.
+
+## Overlays
+
+Avoid overlays unless consumers need the packages inside their own `pkgs`. To export one, import flake-parts' [`easyOverlay`](https://flake.parts/options/flake-parts-easyoverlay.html) (`flake-parts.flakeModules.easyOverlay`) and set `perSystem.overlayAttrs` (e.g. `overlayAttrs = { inherit (config.packages) foo; };`); it becomes `overlays.default`. Don't use it to consume overlays — set `perSystem._module.args.pkgs = import inputs.nixpkgs { inherit system; overlays = [ … ]; }` instead.
