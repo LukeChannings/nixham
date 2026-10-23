@@ -249,10 +249,12 @@ false
 
 Seconds since the last connection opened or closed after
 which the container is stopped; never while a connection, or
-a `container exec`/`attach`, is open.
+a `container exec`/`attach`, is open. It is
+checked every minute, so 0 stops the container at the first
+check without one.
 
 *Type:*
-positive integer, meaning >0
+unsigned integer, meaning >=0
 
 *Default:*
 

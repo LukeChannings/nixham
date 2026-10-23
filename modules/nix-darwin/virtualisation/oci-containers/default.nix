@@ -613,12 +613,14 @@ let
               '';
             };
             idleTimeout = mkOption {
-              type = types.ints.positive;
+              type = types.ints.unsigned;
               default = 1800;
               description = ''
                 Seconds since the last connection opened or closed after
                 which the container is stopped; never while a connection, or
-                a {command}`container exec`/{command}`attach`, is open.
+                a {command}`container exec`/{command}`attach`, is open. It is
+                checked every minute, so 0 stops the container at the first
+                check without one.
               '';
             };
             startTimeout = mkOption {

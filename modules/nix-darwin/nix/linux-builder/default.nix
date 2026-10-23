@@ -219,7 +219,8 @@ in
           Start the builder on Nix's first connection, to
           `127.0.0.1:`{option}`onDemand.port`, and stop it once idle, as
           {option}`virtualisation.oci-containers.containers.<name>.apple-container.onDemand`,
-          which sets the timeouts. When off, the builder runs from login and
+          which sets the timeouts; its `idleTimeout` defaults to 0 here, so the
+          builder stops once no connection is open. When off, the builder runs from login and
           is reached by name, through the runtime's default DNS domain.
         '';
       };
@@ -389,6 +390,7 @@ in
         }";
         onDemand = mkIf cfg.onDemand.enable {
           enable = true;
+          idleTimeout = mkDefault 0;
           ports = [ "127.0.0.1:${toString cfg.onDemand.port}:22" ];
         };
       };

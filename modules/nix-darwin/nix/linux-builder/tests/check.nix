@@ -157,6 +157,9 @@ makeTest {
           ]
         } '["127.0.0.1","22022",["22"],false]'
       '';
+    "on demand, it stops once no connection is open" = ''
+      assert_equal ${toString (builder plain).apple-container.onDemand.idleTimeout} 0
+    '';
     "always on, it runs from login, and is reached by name" = ''
       assert_equal ${
         json (alwaysOn.config.launchd.daemons ? "oci-container-linux-builder-proxy-22022")
