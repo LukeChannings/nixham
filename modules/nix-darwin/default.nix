@@ -17,6 +17,7 @@ rec {
     launchd-wait4path
   ];
   linux-builder = module "linux-builder" ./nix/linux-builder [ oci-containers ];
+  forgejo-runner = module "forgejo-runner" ./services/forgejo-runner [ ];
   garage = module "garage" ./services/garage [ ];
   launchd-logging = module "launchd-logging" ./launchd/logging [ ];
   launchd-wait4path = module "launchd-wait4path" ./launchd/wait4path [ ];
@@ -25,6 +26,7 @@ rec {
   zsh = module "zsh" ./programs/zsh [ ];
   default.imports = [
     acme
+    forgejo-runner
     garage
     launchd-logging
     launchd-wait4path

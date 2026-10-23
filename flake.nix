@@ -104,6 +104,7 @@
                   check = callTest (module + "/oci-containers/tests/check.nix");
                   e2e = callTest (module + "/oci-containers/tests/e2e.nix");
                 };
+                forgejo-runner.check = callTest ./modules/nix-darwin/services/forgejo-runner/tests/check.nix;
                 garage.check = callTest ./modules/nix-darwin/services/garage/tests/check.nix;
                 launchctl-completions = config.packages.launchctl-completions.tests;
                 launchd = {
