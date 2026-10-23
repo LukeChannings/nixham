@@ -1,4 +1,5 @@
 {
+  lib,
   writeShellApplication,
   callPackage,
   coreutils,
@@ -21,6 +22,10 @@ let
       kernel=${kernel}/vmlinux-arm64
     ''
     + builtins.readFile ./linux-builder.sh;
+    meta = {
+      description = "Run a shell or console against an ephemeral Linux Nix builder in Apple's container runtime";
+      license = lib.licenses.mit;
+    };
     passthru = {
       inherit kernel;
       tests = callPackage ./tests { inherit linux-builder nixham; };

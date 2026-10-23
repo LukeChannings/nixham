@@ -37,6 +37,10 @@ let
   linux-builder-image =
     pkgs.runCommand "linux-builder-oci.tar"
       {
+        meta = {
+          description = "OCI image of a NixOS Linux Nix builder";
+          license = pkgs.lib.licenses.mit;
+        };
         passthru = {
           nixosConfig = nixos.config;
           inherit imageRef image;

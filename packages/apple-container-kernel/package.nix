@@ -72,7 +72,10 @@ linuxPkgs.runCommand "apple-container-kernel-${version}"
       # building the kernel.
       tests.config = configfile;
     };
-    meta.description = "KVM-capable guest kernel for Apple's container runtime";
+    meta = {
+      description = "KVM-capable guest kernel for Apple's container runtime";
+      inherit (image.meta) license;
+    };
   }
   ''
     mkdir -p $out
