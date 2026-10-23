@@ -99,6 +99,7 @@
                   volumes-root = callTest (module + "/apple-container/tests/volumes-root.nix");
                   e2e = callTest (module + "/apple-container/tests/e2e.nix");
                 };
+                nginx.check = callTest ./modules/nix-darwin/services/nginx/tests/check.nix;
                 oci-containers = {
                   check = callTest (module + "/oci-containers/tests/check.nix");
                   e2e = callTest (module + "/oci-containers/tests/e2e.nix");

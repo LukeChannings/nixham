@@ -1,6 +1,7 @@
 # nix-darwin systems with nixham's modules, for the modules' tests.
 {
   lib,
+  stdenv,
   writeText,
   nix-darwin,
   darwinModules,
@@ -9,7 +10,12 @@ let
   # A check reads the config as text: it must not build the darwin closure.
   plain = s: builtins.unsafeDiscardStringContext (toString s);
 in
-{
+rec {
+  # evalNative <modules>: eval, for the build platform, so a check can build
+  # the files the config refers to, and read or run them.
+  evalNative =
+    modules: eval (modules ++ [ { nixpkgs.hostPlatform = lib.mkForce stdenv.hostPlatform.system; } ]);
+
   eval =
     modules:
     let

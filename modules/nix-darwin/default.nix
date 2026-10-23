@@ -11,6 +11,7 @@ in
 rec {
   acme = module "acme" ./security/acme [ ];
   apple-container = module "apple-container" ./virtualisation/apple-container [ ];
+  nginx = module "nginx" ./services/nginx [ acme ];
   oci-containers = module "oci-containers" ./virtualisation/oci-containers [
     apple-container
     launchd-wait4path
@@ -26,6 +27,7 @@ rec {
     launchd-logging
     launchd-wait4path
     linux-builder
+    nginx
     pki-keychain
     virtual-interfaces
     zsh
