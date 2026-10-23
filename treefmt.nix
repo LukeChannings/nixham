@@ -8,6 +8,15 @@
   # `nix-build -A` only auto-calls a `{ ... }:` default.nix, not `_:`.
   programs.statix.disabled-lints = [ "empty_pattern" ];
   programs.just.enable = true;
+  programs.mdformat = {
+    enable = true;
+    plugins = ps: [
+      ps.mdformat-gfm
+      ps.mdformat-frontmatter
+    ];
+    settings.number = true;
+    settings.wrap = "keep";
+  };
   programs.shfmt.enable = true;
   programs.yamllint.enable = true;
   programs.actionlint.enable = true;

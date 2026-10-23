@@ -41,7 +41,7 @@ Ask which programs they want available. Copy [`templates/simple-shell/`](templat
 
 Start from Scenario 1b, then:
 
-1. Detect the ecosystem (package.json, Cargo.toml, go.mod, pyproject.toml, *.cabal, etc.).
+1. Detect the ecosystem (package.json, Cargo.toml, go.mod, pyproject.toml, \*.cabal, etc.).
 2. Follow [ECOSYSTEMS.md](ECOSYSTEMS.md) for the builder, devshell toolchain, and formatter for that ecosystem (JS/TS → buildNpmPackage + biome, Rust → crane, Python → nixpkgs python devshell + pyproject.nix, Go → buildGoModule). The packaging rule is **colocation**: a derivation that packages an in-repo source tree lives with that tree, as a `package.nix` at its root (repo root for a single-package repo), wired in `flake.nix` with `pkgs.callPackage ./path/to/package.nix { }` — never inlined in `flake.nix`. A central `packages/` directory is for everything else: vendored out-of-repo software and packages implemented entirely within it (`packages/<foo>/package.nix` whose source *is* there is fine; `packages/foo.nix` reaching into `../some/dir` is not). Set `packages.default`.
 3. Extend `treefmt.nix` with formatters already used by the project — consult the treefmt-nix repo for available programs; don't introduce new formatters uninvited beyond the nix-base set.
 4. Fill in the `Justfile`: drop recipes the project has no use for, set the binary name in `run`, wire `test` to the project's test runner (splitting into `test-unit`/`test-integration` if the suite distinguishes them, with `test` running both), and adapt recipe bodies to the ecosystem's native commands where that's the better dev loop (e.g. `cargo test`) — but keep the recipe names stable, and keep `build`/`build-all` as `nix-build`s: the Build workflow runs one and pushes `./result*`.
