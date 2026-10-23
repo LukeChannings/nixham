@@ -11,6 +11,7 @@
 - [programs.zsh](nix-darwin/zsh.md)
 - [security.acme](nix-darwin/acme.md)
 - [security.pki.keychainCertificates](nix-darwin/pki-keychain.md)
+- [services.alloy](nix-darwin/alloy.md)
 - [services.forgejo-runner](nix-darwin/forgejo-runner.md)
 - [services.garage](nix-darwin/garage.md)
 - [services.nginx](nix-darwin/nginx.md)

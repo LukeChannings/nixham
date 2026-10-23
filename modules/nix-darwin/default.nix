@@ -10,6 +10,7 @@ let
 in
 rec {
   acme = module "acme" ./security/acme [ ];
+  alloy = module "alloy" ./services/monitoring/alloy [ ];
   apple-container = module "apple-container" ./virtualisation/apple-container [ ];
   nginx = module "nginx" ./services/nginx [ acme ];
   oci-containers = module "oci-containers" ./virtualisation/oci-containers [
@@ -26,6 +27,7 @@ rec {
   zsh = module "zsh" ./programs/zsh [ ];
   default.imports = [
     acme
+    alloy
     forgejo-runner
     garage
     launchd-logging
