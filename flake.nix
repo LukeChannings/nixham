@@ -101,9 +101,15 @@
                   check = callTest (module + "/oci-containers/tests/check.nix");
                   e2e = callTest (module + "/oci-containers/tests/e2e.nix");
                 };
+                linux-builder = config.packages.linux-builder.tests // {
+                  module = callTest ./modules/nix-darwin/nix/linux-builder/tests/check.nix;
+                  pre-start = callTest ./modules/nix-darwin/nix/linux-builder/tests/pre-start.nix;
+                  provision = callTest ./modules/nix-darwin/nix/linux-builder/tests/provision.nix;
+                  module-e2e = callTest ./modules/nix-darwin/nix/linux-builder/tests/e2e.nix;
+                };
               }
               // lib.mapAttrs (_: p: p.tests) {
-                inherit (config.packages) apple-container-kernel linux-builder linux-builder-image;
+                inherit (config.packages) apple-container-kernel linux-builder-image;
               };
 
             legacyPackages.selectTests = testing.select config.legacyPackages.tests;

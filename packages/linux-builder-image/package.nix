@@ -6,6 +6,7 @@
   path,
   # The nix2container flake input (pinned in flake.lock).
   nix2container,
+  name ? "linux-builder",
   modules ? [ ],
 }:
 let
@@ -34,7 +35,7 @@ let
   n2c = import nix2container { inherit pkgs; };
 
   image = n2c.nix2container.buildImage {
-    name = "linux-builder";
+    inherit name;
     tag = builtins.substring 0 32 (baseNameOf toplevel);
     # Seeds the Nix DB on boot (./persistent-store.nix).
     copyToRoot = pkgs.runCommand "linux-builder-root" { } ''
@@ -59,7 +60,7 @@ let
         passthru = {
           nixosConfig = nixos.config;
           inherit imageRef image;
-          inherit (image) imageTag;
+          inherit (image) imageName imageTag;
           tests = callPackage ./tests { inherit linux-builder-image nix2container; };
         };
       }

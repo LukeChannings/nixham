@@ -5,4 +5,5 @@
 ## nix-darwin
 
 - [apple-container](nix-darwin/apple-container.md)
+- [linux-builder](nix-darwin/linux-builder.md)
 - [oci-containers](nix-darwin/oci-containers.md)
