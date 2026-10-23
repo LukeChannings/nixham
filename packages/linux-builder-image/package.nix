@@ -9,10 +9,25 @@
   modules ? [ ],
 }:
 let
-  nixos = import (path + "/nixos/lib/eval-config.nix") {
+  base = import (path + "/nixos/lib/eval-config.nix") {
     system = null;
-    modules = [ ./base-profile.nix ] ++ modules;
+    modules = [ ./base-profile.nix ];
   };
+  # The base's nix.conf, so that Nix settings, which ship at runtime
+  # (system.build.shuttledNixConf), leave the image as it is.
+  nixos =
+    if modules == [ ] then
+      base
+    else
+      base.extendModules {
+        modules = modules ++ [
+          {
+            environment.etc."nix/nix.conf".source =
+              base.lib.mkOverride 40
+                base.config.environment.etc."nix/nix.conf".source;
+          }
+        ];
+      };
 
   inherit (nixos) pkgs;
   inherit (nixos.config.system.build) toplevel;

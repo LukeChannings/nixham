@@ -13,3 +13,7 @@ The OCI image of a NixOS system purpose-built to act as the linux-builder. Confi
 
 **/config contract**:
 The image's runtime configuration surface: a read-only bind mount at `/config` (SSH `authorized_keys.d/<user>`, host key + optional cert, `trusted_user_ca_keys`, `nix.conf`) plus `NIX_CONFIG`/`NIX_CONFIG_*` environment variables, snapshotted once at boot into root-only RAM.
+
+**shuttled nix.conf**:
+The image's Nix settings, sent at boot as `NIX_CONFIG` instead of built into it. The image's own nix.conf is frozen to the base profile's, so changing Nix settings alone reuses the image; anything else rebuilds it.
+_Avoid_: runtime nix.conf

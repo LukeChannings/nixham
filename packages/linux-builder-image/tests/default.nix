@@ -53,6 +53,10 @@ let
 in
 {
   check = callPackage ./check.nix { inherit makeTest linux-builder-image; };
+  freeze = callPackage ./freeze.nix {
+    inherit makeTest linux-builder-image;
+    inherit (args) variant;
+  };
 }
 // lib.genAttrs [
   "bare"

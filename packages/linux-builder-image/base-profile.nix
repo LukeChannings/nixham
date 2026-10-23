@@ -79,6 +79,15 @@ let
     [ ! -f ${snapshot}/config/nix.conf ] || warn_missing_includes ${snapshot}/config/nix.conf /config/nix.conf
     warn_missing_includes ${snapshot}/environment.conf "the environment"
   '';
+  nixConf =
+    extraOptions:
+    (pkgs.formats.nixConf {
+      inherit (config.nix) package checkAllErrors checkConfig;
+      inherit (config.nix.package.out) version;
+      inherit extraOptions;
+    }).generate
+      "nix.conf"
+      config.nix.settings;
 in
 {
   imports = [
@@ -255,10 +264,22 @@ in
     ${runtimeConfig}
   '';
 
-  nix.extraOptions = ''
-    !include ${snapshot}/config/nix.conf
-    !include ${snapshot}/environment.conf
-  '';
+  # Frozen into the image by ./package.nix, which leaves this the base's
+  # nix.conf; the merged settings ship as NIX_CONFIG, which the includes read.
+  environment.etc."nix/nix.conf".source = mkForce (
+    nixConf (
+      config.nix.extraOptions
+      + ''
+        !include ${snapshot}/config/nix.conf
+        !include ${snapshot}/environment.conf
+      ''
+    )
+  );
+  system.build.shuttledNixConf = (nixConf config.nix.extraOptions).text;
+  # Store paths in the settings must be in the image all the same.
+  system.extraDependencies = lib.optional (builtins.hasContext config.system.build.shuttledNixConf) (
+    pkgs.writeText "shuttled-nix.conf" config.system.build.shuttledNixConf
+  );
 
   nix.settings = {
     trusted-users = [ "builder" ];
