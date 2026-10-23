@@ -100,6 +100,7 @@
                   volumes-root = callTest (module + "/apple-container/tests/volumes-root.nix");
                   e2e = callTest (module + "/apple-container/tests/e2e.nix");
                 };
+                litellm.check = callTest ./modules/nix-darwin/services/litellm/tests/check.nix;
                 nginx.check = callTest ./modules/nix-darwin/services/nginx/tests/check.nix;
                 oci-containers = {
                   check = callTest (module + "/oci-containers/tests/check.nix");

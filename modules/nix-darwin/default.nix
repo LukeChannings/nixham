@@ -17,6 +17,7 @@ rec {
     apple-container
     launchd-wait4path
   ];
+  litellm = module "litellm" ./services/litellm [ launchd-wait4path ];
   linux-builder = module "linux-builder" ./nix/linux-builder [ oci-containers ];
   forgejo-runner = module "forgejo-runner" ./services/forgejo-runner [ ];
   garage = module "garage" ./services/garage [ ];
@@ -33,6 +34,7 @@ rec {
     launchd-logging
     launchd-wait4path
     linux-builder
+    litellm
     nginx
     pki-keychain
     virtual-interfaces

@@ -14,6 +14,7 @@
 - [services.alloy](nix-darwin/alloy.md)
 - [services.forgejo-runner](nix-darwin/forgejo-runner.md)
 - [services.garage](nix-darwin/garage.md)
+- [services.litellm](nix-darwin/litellm.md)
 - [services.nginx](nix-darwin/nginx.md)
 - [virtualisation.apple-container](nix-darwin/apple-container.md)
 - [virtualisation.oci-containers](nix-darwin/oci-containers.md)
