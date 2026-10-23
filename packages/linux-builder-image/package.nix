@@ -2,13 +2,14 @@
 # `modules`, as the oci-archive `container image load` takes. A single layer
 # holds the system's closure; the archive is a streaming re-pack of it.
 {
+  callPackage,
   path,
   # The nix2container flake input (pinned in flake.lock).
   nix2container,
   modules ? [ ],
 }:
 let
-  nixos = import "${path}/nixos/lib/eval-config.nix" {
+  nixos = import (path + "/nixos/lib/eval-config.nix") {
     system = null;
     modules = [ ./base-profile.nix ] ++ modules;
   };
@@ -32,16 +33,20 @@ let
   };
 
   imageRef = "${image.imageName}:${image.imageTag}";
+
+  linux-builder-image =
+    pkgs.runCommand "linux-builder-oci.tar"
+      {
+        passthru = {
+          nixosConfig = nixos.config;
+          inherit imageRef image;
+          inherit (image) imageTag;
+          tests = callPackage ./tests { inherit linux-builder-image nix2container; };
+        };
+      }
+      ''
+        ${n2c.skopeo-nix2container}/bin/skopeo --insecure-policy copy --tmpdir "$TMPDIR" \
+          nix:${image} oci-archive:$out:${imageRef}
+      '';
 in
-pkgs.runCommand "linux-builder-oci.tar"
-  {
-    passthru = {
-      nixosConfig = nixos.config;
-      inherit imageRef image;
-      inherit (image) imageTag;
-    };
-  }
-  ''
-    ${n2c.skopeo-nix2container}/bin/skopeo --insecure-policy copy --tmpdir "$TMPDIR" \
-      nix:${image} oci-archive:$out:${imageRef}
-  ''
+linux-builder-image

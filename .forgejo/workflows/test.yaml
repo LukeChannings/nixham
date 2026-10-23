@@ -8,8 +8,11 @@ name: Test
 
 jobs:
   test:
-    name: Test
-    runs-on: nixos-latest
+    name: Test (${{ matrix.runner }})
+    strategy:
+      matrix:
+        runner: [nixos-latest, nixos-latest-arm64]
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         env:

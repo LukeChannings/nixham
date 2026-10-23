@@ -14,4 +14,8 @@ let
 
   system = builtins.currentSystem;
 in
-flake.defaultNix // flake.defaultNix.packages.${system}
+flake.defaultNix
+// flake.defaultNix.packages.${system}
+// {
+  inherit (flake.defaultNix.legacyPackages.${system}) tests selectTests;
+}

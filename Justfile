@@ -8,46 +8,55 @@ format:
 
 alias fmt := format
 
-# The flake's checks.treefmt output exists for CI, where a store copy
-# is acceptable; day to day, check the live tree instead.
+# checks.treefmt is for `nix flake check`: it can't build from the live
+# tree default.nix evaluates.
 
-# Check the working tree directly (no store copy)
-check:
+# Lint the working tree directly
+lint:
     treefmt --ci
 
-alias lint := check
-
-# Live suites: they need macOS, apple/container and the host's builder;
-# nix flake check cannot run them. A suite filtered down to nothing (e.g.
-# `just test -- --filter 'some test'`) is not a failure.
-
-# Run every test.sh in the repo, or those whose directory is named NAMES; bats arguments go after --
-[positional-arguments]
+# Build the checks, or those of components (or component.scope) NAMES
 test *NAMES:
     #!/usr/bin/env bash
     set -euo pipefail
-    names=() args=()
-    while [ $# -gt 0 ] && [ "$1" != -- ]; do names+=("$1"); shift; done
+    names=""
+    for n in {{ NAMES }}; do names+="\"$n\" "; done
+    nix-build --no-out-link -E "(import ./. { }).selectTests \"check\" [ $names]" >/dev/null
+
+# End-to-end tests (docs/adr/0001) run here, in this user's session: they need
+# macOS and apple/container. A selection filtered down to nothing (e.g.
+# `just test-e2e -- --filter 'some test'`) is not a failure.
+
+# Run the end-to-end tests, or those of components (or component.scope) NAMES; bats arguments go after --
+[positional-arguments]
+test-e2e *ARGS:
+    @just _run e2e "$@"
+
+# Run the benchmarks, or those of components (or component.scope) NAMES; bats arguments go after --
+[positional-arguments]
+bench *ARGS:
+    @just _run benchmark "$@"
+
+[positional-arguments]
+_run KIND *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    kind=$1
+    shift
+    names="" args=()
+    while [ $# -gt 0 ] && [ "$1" != -- ]; do names+="\"$1\" "; shift; done
     [ $# -eq 0 ] || { shift; args=(--allow-empty-suite "$@"); }
-    mapfile -t all < <(find . \( -name .git -o -name .worktrees -o -name 'result*' \) -prune -o -name test.sh -print | sort)
-    suites=()
-    if [ ${#names[@]} -eq 0 ]; then
-      suites=("${all[@]}")
-    else
-      for name in "${names[@]}"; do
-        found=0
-        for s in "${all[@]}"; do
-          if [ "$(basename "$(dirname "$s")")" = "$name" ]; then suites+=("$s"); found=1; fi
-        done
-        [ "$found" = 1 ] || { echo "no test.sh in a directory named '$name'" >&2; exit 1; }
-      done
-    fi
-    # bats exits 1 when interrupted, so without this ^C moves on to the next suite.
+    runners=()
+    while read -r r; do runners+=("$r"); done < <(nix-build --no-out-link -E "(import ./. { }).selectTests \"$kind\" [ $names]")
+    [ ${#runners[@]} -gt 0 ] || { echo "no $kind tests here" >&2; exit 1; }
+    # bats exits 1 when interrupted, so without this ^C moves on to the next runner.
     trap 'exit 130' INT
     status=0
-    for s in "${suites[@]}"; do
-      echo "=== $s ===" >&2
-      "$s" "${args[@]}" || status=1
+    for r in "${runners[@]}"; do
+      for bin in "$r"/bin/*; do
+        echo "=== $(basename "$bin") ===" >&2
+        "$bin" ${args[@]+"${args[@]}"} || status=1
+      done
     done
     exit "$status"
 

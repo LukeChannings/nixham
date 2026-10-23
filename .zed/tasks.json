@@ -1,7 +1,7 @@
 [
   { "label": "Build", "command": "just", "args": ["build-all"] },
-  { "label": "Check", "command": "just", "args": ["check"] },
   { "label": "Format", "command": "just", "args": ["format"] },
+  { "label": "Lint", "command": "just", "args": ["lint"] },
   { "label": "Test", "command": "just", "args": ["test"] },
   {
     "label": "Initialise worktree",

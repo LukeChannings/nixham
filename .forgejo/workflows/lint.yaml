@@ -21,4 +21,4 @@ jobs:
           "https://$TOKEN@forge.channings.me/$GITHUB_REPOSITORY.git" .
       - uses: ./.forgejo/actions/setup-nix-shell
       - name: Lint
-        run: just check
+        run: just lint

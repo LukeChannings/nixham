@@ -25,4 +25,4 @@ jobs:
       - uses: ./.forgejo/actions/substituter
       - uses: ./.forgejo/actions/setup-nix-shell
       - name: Lint
-        run: just check
+        run: just lint

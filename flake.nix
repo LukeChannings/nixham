@@ -42,9 +42,11 @@
             config,
             pkgs,
             lib,
-            system,
             ...
           }:
+          let
+            testing = pkgs.callPackage ./lib/testing { };
+          in
           {
             packages = {
               apple-container-kernel = pkgs.callPackage ./packages/apple-container-kernel/package.nix {
@@ -62,22 +64,35 @@
 
             treefmt = ./treefmt.nix;
 
-            # The configfile derivation asserts CONFIG_KVM/CONFIG_EROFS_FS survive
-            # olddefconfig — a cheap regression check without building the kernel.
-            checks = lib.optionalAttrs (system == "aarch64-linux") {
-              apple-container-kernel-config = config.packages.apple-container-kernel.configfile;
-            };
+            legacyPackages.tests =
+              let
+                callTest =
+                  path:
+                  lib.callPackageWith (
+                    pkgs
+                    // config.packages
+                    // {
+                      inherit (testing) makeTest;
+                    }
+                  ) path { };
+              in
+              {
+                niks3-pin.check = callTest ./.forgejo/actions/niks3-pin/tests/check.nix;
+                niks3-push.check = callTest ./.forgejo/actions/niks3-push/tests/check.nix;
+                oci-publish.check = callTest ./.forgejo/actions/oci-publish/tests/check.nix;
+                setup-nix-shell.check = callTest ./.forgejo/actions/setup-nix-shell/tests/check.nix;
+              }
+              // lib.mapAttrs (_: p: p.tests) {
+                inherit (config.packages) apple-container-kernel linux-builder linux-builder-image;
+              };
+
+            legacyPackages.selectTests = testing.select config.legacyPackages.tests;
+
+            checks = testing.ofKind "check" config.legacyPackages.tests;
 
             devShells.default = pkgs.mkShell {
               packages = with pkgs; [
-                (bats.withLibraries (p: [
-                  p.bats-support
-                  p.bats-assert
-                ]))
-                jq
                 just
-                # bats --jobs
-                parallel
                 config.treefmt.build.wrapper
               ];
             };

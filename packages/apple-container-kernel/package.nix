@@ -53,6 +53,8 @@ let
       cp .config $out
       runHook postInstall
     '';
+
+    meta.platforms = [ "aarch64-linux" ];
   };
 
   image = linuxPkgs.linuxKernel.manualConfig {
@@ -66,6 +68,9 @@ linuxPkgs.runCommand "apple-container-kernel-${version}"
   {
     passthru = {
       inherit image configfile;
+      # Asserts CONFIG_KVM/CONFIG_EROFS_FS survive olddefconfig, without
+      # building the kernel.
+      tests.config = configfile;
     };
     meta.description = "KVM-capable guest kernel for Apple's container runtime";
   }
