@@ -1,0 +1,188 @@
+#compdef launchctl
+#autoload
+
+local state
+local -a cmds
+
+cmds=(
+  'bootstrap:bootstrap a launchd domain or add services to a domain'
+  'bootout:tear down a launchd domain or remove services from a domain'
+  'enable:enable an existing service in a domain'
+  'disable:disable an existing service in a domain'
+  'kickstart:force a service to start'
+  'kill:send a signal to a running service'
+  'blame:print the reason a service is running'
+  'print:print a description of a domain or service'
+  'print-cache:print the contents of the launchd service cache'
+  'print-disabled:print which services are disabled in a domain'
+  'procinfo:print information about a process'
+  'hostinfo:print information about the system'
+  'resolveport:resolve a port name to a process'
+  'examine:reflect on launchd state'
+  'config:set persistent configuration values'
+  'runstats:print runtime statistics for a service'
+  'reboot:reboot the system'
+  'error:print a description for an error code'
+  'variant:print the launchd variant'
+  'version:print the launchd version'
+  'load:load configuration files and/or directories'
+  'unload:unload configuration files and/or directories'
+  'start:start the specified job'
+  'stop:stop the specified job if it is running'
+  'list:list jobs and information about jobs'
+  'remove:remove the specified job'
+  'submit:submit a job from the command line'
+  'asuser:run as the given user'
+  'bsexec:run in the given bootstrap context'
+  'managerpid:print the PID of the launchd managing this interaction'
+  'manageruid:print the UID of the launchd managing this interaction'
+  'managername:print the name of the launchd managing this interaction'
+  'help:print usage information'
+)
+
+_launchctl_domain_targets() {
+  local uid=$(id -u)
+  local -a targets
+  targets=(
+    "system:system-wide domain"
+    "user/${uid}:user domain for current user (UID ${uid})"
+    "gui/${uid}:GUI domain for current user (UID ${uid})"
+  )
+  _describe -t domain-targets 'domain target' targets
+}
+
+_launchctl_service_names() {
+  local -a services
+  services=(${(f)"$(launchctl list 2>/dev/null | awk 'NR>1 && $3 ~ /\./ {print $3}')"})
+  if (( ${#services} > 0 )); then
+    _describe -t services 'launchd service' services
+  fi
+}
+
+_launchctl_plist_files() {
+  _alternative \
+    "plist-files:plist file:_files -g '*.plist'" \
+    "user-launchagents:~/Library/LaunchAgents:_files -W ~/Library/LaunchAgents -g '*.plist'" \
+    "system-launchagents:/Library/LaunchAgents:_files -W /Library/LaunchAgents -g '*.plist'" \
+    "system-launchdaemons:/Library/LaunchDaemons:_files -W /Library/LaunchDaemons -g '*.plist'"
+}
+
+_arguments -C \
+  '1:launchctl command:->cmds' \
+  '*::args:->args'
+
+case $state in
+  cmds)
+    _describe -t commands 'launchctl command' cmds
+    ;;
+  args)
+    case $words[1] in
+      bootstrap)
+        case $CURRENT in
+          2) _launchctl_domain_targets ;;
+          3) _launchctl_plist_files ;;
+        esac
+        ;;
+      bootout)
+        case $CURRENT in
+          2) _launchctl_domain_targets ;;
+          3) _launchctl_service_names ;;
+        esac
+        ;;
+      enable|disable|blame)
+        if (( CURRENT == 2 )); then
+          _launchctl_service_names
+        fi
+        ;;
+      kickstart)
+        _arguments \
+          '-k[kill a running instance before restarting]' \
+          '-p[print the PID of the started service on stdout]' \
+          '*:service target:_launchctl_service_names'
+        ;;
+      kill)
+        case $CURRENT in
+          2) _signals ;;
+          3) _launchctl_service_names ;;
+        esac
+        ;;
+      print)
+        if (( CURRENT == 2 )); then
+          _alternative \
+            'domain-targets:domain target:_launchctl_domain_targets' \
+            'service-names:service name:_launchctl_service_names'
+        fi
+        ;;
+      print-disabled)
+        if (( CURRENT == 2 )); then
+          _launchctl_domain_targets
+        fi
+        ;;
+      procinfo|bsexec)
+        if (( CURRENT == 2 )); then
+          _pids
+        fi
+        ;;
+      resolveport)
+        if (( CURRENT == 2 )); then
+          _pids
+        fi
+        ;;
+      runstats)
+        if (( CURRENT == 2 )); then
+          _launchctl_service_names
+        fi
+        ;;
+      config)
+        if (( CURRENT == 2 )); then
+          local -a config_domains
+          config_domains=('system:persistent system configuration' 'user:persistent user configuration')
+          _describe -t config-domains 'configuration domain' config_domains
+        fi
+        ;;
+      reboot)
+        if (( CURRENT == 2 )); then
+          local -a reboot_targets
+          reboot_targets=(
+            'system:perform a full system reboot'
+            'userspace:reboot only userspace'
+            'logout:log out the current user'
+            'apps:reboot only applications'
+            'reroot:reboot with a new root filesystem'
+          )
+          _describe -t reboot-targets 'reboot target' reboot_targets
+        fi
+        ;;
+      load|unload)
+        _arguments \
+          '-w[override the Disabled key and persist the new value]' \
+          '-F[force the loading/unloading operation]' \
+          '-S+[target a session type]:session:(Aqua LoginWindow Background System)' \
+          '-D+[load/unload from the specified domain]:domain:(all local network system login user)' \
+          '*:plist file or directory:_launchctl_plist_files'
+        ;;
+      start|stop|remove)
+        _launchctl_service_names
+        ;;
+      list)
+        if (( CURRENT == 2 )); then
+          _launchctl_service_names
+        fi
+        ;;
+      submit)
+        _arguments \
+          '-l+[specify the job label]:label:' \
+          '-p+[specify the program to run]:program:_command_names' \
+          '-o+[redirect standard output to the given file]:stdout:_files' \
+          '-e+[redirect standard error to the given file]:stderr:_files' \
+          '--:program with arguments:_cmdstring'
+        ;;
+      asuser)
+        case $CURRENT in
+          2) _users ;;
+          *) _command_names ;;
+        esac
+        ;;
+    esac
+    ;;
+esac
