@@ -5,5 +5,6 @@
 ## nix-darwin
 
 - [nix.linux-builder](nix-darwin/linux-builder.md)
+- [programs.zsh](nix-darwin/zsh.md)
 - [virtualisation.apple-container](nix-darwin/apple-container.md)
 - [virtualisation.oci-containers](nix-darwin/oci-containers.md)

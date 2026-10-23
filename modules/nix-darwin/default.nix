@@ -12,5 +12,9 @@ rec {
   apple-container = module "apple-container" ./virtualisation/apple-container [ ];
   oci-containers = module "oci-containers" ./virtualisation/oci-containers [ apple-container ];
   linux-builder = module "linux-builder" ./nix/linux-builder [ oci-containers ];
-  default.imports = [ linux-builder ];
+  zsh = module "zsh" ./programs/zsh [ ];
+  default.imports = [
+    linux-builder
+    zsh
+  ];
 }

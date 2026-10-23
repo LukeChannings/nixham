@@ -58,7 +58,10 @@ let
     };
 
   # For modules whose options' longest shared path isn't their namespace.
-  namespaces.oci-containers = "virtualisation.oci-containers";
+  namespaces = {
+    oci-containers = "virtualisation.oci-containers";
+    zsh = "programs.zsh";
+  };
   namespace =
     m:
     let

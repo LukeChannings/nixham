@@ -101,6 +101,7 @@
                   check = callTest (module + "/oci-containers/tests/check.nix");
                   e2e = callTest (module + "/oci-containers/tests/e2e.nix");
                 };
+                zsh.check = callTest ./modules/nix-darwin/programs/zsh/tests/check.nix;
                 linux-builder = config.packages.linux-builder.tests // {
                   module = callTest ./modules/nix-darwin/nix/linux-builder/tests/check.nix;
                   pre-start = callTest ./modules/nix-darwin/nix/linux-builder/tests/pre-start.nix;
