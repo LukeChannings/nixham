@@ -57,6 +57,13 @@ makeTest {
       assert_output changed
       assert_equal "$(authorized)" "$(sort <<<"$(pub "$dir/ssh_key")"$'\n'"$(pub "$BATS_TEST_TMPDIR/k")")"
     '';
+    "a key its own user shares with a group is authorized" = ''
+      ssh-keygen -q -t ed25519 -N "" -f "$BATS_TEST_TMPDIR/k"
+      chmod 440 "$BATS_TEST_TMPDIR/k"
+      run provision "$BATS_TEST_TMPDIR/k"
+      assert_success
+      assert_equal "$(authorized)" "$(sort <<<"$(pub "$dir/ssh_key")"$'\n'"$(pub "$BATS_TEST_TMPDIR/k")")"
+    '';
     "a deleted host key is replaced, and pinned" = ''
       provision
       old="$(cat "$dir/known_hosts")"

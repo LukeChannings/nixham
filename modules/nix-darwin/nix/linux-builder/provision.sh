@@ -34,8 +34,12 @@ if [ ! -e "$hostKey" ]; then
 fi
 chown "$user" "$hostKey" "$hostKey.pub"
 
+copy=$(mktemp)
+trap 'rm -f "$copy"' EXIT
 for key in "$dir/ssh_key" "$@"; do
-  ssh-keygen -y -f "$key" | cut -d' ' -f1,2
+  # ssh-keygen ignores a key its own user shares, as root does a group-readable userSshKeyFile.
+  cat -- "$key" >"$copy"
+  ssh-keygen -y -f "$copy" | cut -d' ' -f1,2
 done | sort -u >"$config/ssh/authorized_keys.d/$sshUser"
 chown "$user" "$config/ssh/authorized_keys.d/$sshUser"
 chmod 644 "$config/ssh/authorized_keys.d/$sshUser"
