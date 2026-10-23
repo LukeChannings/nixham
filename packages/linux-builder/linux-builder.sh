@@ -93,7 +93,10 @@ else
   }
 fi
 
-run=(container run --rm --rosetta --cap-add CAP_SYS_ADMIN --cap-add CAP_NET_ADMIN --kernel "$kernel")
+# No masked or read-only paths: their mounts over /proc stop Nix's sandbox
+# mounting a fresh one (apple/container >= 1.5.0).
+run=(container run --rm --rosetta --cap-add CAP_SYS_ADMIN --cap-add CAP_NET_ADMIN
+  --masked-path NONE --read-only-path NONE --kernel "$kernel")
 
 if [ "$mode" = tty ]; then
   say "starting the builder's console; exit stops it"

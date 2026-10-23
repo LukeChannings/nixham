@@ -16,7 +16,7 @@ scope {
     # macOS script rejects a fifo as its input; a coprocess's pipe it accepts.
     coproc CONSOLE {
       script -q -F "$BATS_FILE_TMPDIR/console.log" container run -it --name "$CONTAINER" \
-        --cap-add CAP_SYS_ADMIN --cap-add CAP_NET_ADMIN --kernel "$LBI_KERNEL" "$REF" \
+        "''${RUN_FLAGS[@]}" --kernel "$LBI_KERNEL" "$REF" \
         >/dev/null 2>&1 3>&-
     }
 

@@ -11,6 +11,9 @@ PERL=/usr/bin/perl
 SSH_USER=builder
 SSH_KEY="$BATS_FILE_TMPDIR/key"
 
+# As linux-builder runs it.
+RUN_FLAGS=(--cap-add CAP_SYS_ADMIN --cap-add CAP_NET_ADMIN --masked-path NONE --read-only-path NONE)
+
 SSHO=(-o IdentitiesOnly=yes -o IdentityAgent=none
   -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
   -o BatchMode=yes -o ConnectTimeout=20)
@@ -114,7 +117,7 @@ boot_container() {
   local ref=$1 addr
   shift
   container rm -f "$CONTAINER" >/dev/null 2>&1 || true
-  container run -d --name "$CONTAINER" --cap-add CAP_SYS_ADMIN --cap-add CAP_NET_ADMIN \
+  container run -d --name "$CONTAINER" "${RUN_FLAGS[@]}" \
     --kernel "$LBI_KERNEL" "$@" "$ref" >/dev/null
   addr="$(container_ip "$CONTAINER")"
   [ -n "$addr" ] || fail "no IPv4 address for $CONTAINER"
