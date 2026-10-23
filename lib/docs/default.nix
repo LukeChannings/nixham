@@ -59,6 +59,7 @@ let
 
   # For modules whose options' longest shared path isn't their namespace.
   namespaces = {
+    launchd-wait4path = "launchd.*.waitForPaths";
     oci-containers = "virtualisation.oci-containers";
     zsh = "programs.zsh";
   };

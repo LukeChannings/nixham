@@ -4,6 +4,7 @@
 
 ## nix-darwin
 
+- [launchd.\*.waitForPaths](nix-darwin/launchd-wait4path.md)
 - [nix.linux-builder](nix-darwin/linux-builder.md)
 - [programs.zsh](nix-darwin/zsh.md)
 - [virtualisation.apple-container](nix-darwin/apple-container.md)

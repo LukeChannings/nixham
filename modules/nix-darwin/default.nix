@@ -10,10 +10,15 @@ let
 in
 rec {
   apple-container = module "apple-container" ./virtualisation/apple-container [ ];
-  oci-containers = module "oci-containers" ./virtualisation/oci-containers [ apple-container ];
+  oci-containers = module "oci-containers" ./virtualisation/oci-containers [
+    apple-container
+    launchd-wait4path
+  ];
   linux-builder = module "linux-builder" ./nix/linux-builder [ oci-containers ];
+  launchd-wait4path = module "launchd-wait4path" ./launchd/wait4path [ ];
   zsh = module "zsh" ./programs/zsh [ ];
   default.imports = [
+    launchd-wait4path
     linux-builder
     zsh
   ];

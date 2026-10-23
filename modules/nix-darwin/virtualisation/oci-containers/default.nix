@@ -753,9 +753,10 @@ in
               p = parsePort spec;
             in
             nameValuePair "oci-container-${name}-proxy-${p.hostPort}" {
+              # Not through /bin/sh: fd 2 is the client's socket until the
+              # script redirects it.
+              allowBareStorePathProgram = true;
               serviceConfig = {
-                # Not through /bin/sh: fd 2 is the client's socket until the
-                # script redirects it.
                 ProgramArguments = [
                   "${c.apple-container.onDemand.proxy}"
                   p.containerPort
