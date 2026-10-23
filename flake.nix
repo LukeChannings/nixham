@@ -107,6 +107,7 @@
                   logging = callTest ./modules/nix-darwin/launchd/logging/tests/check.nix;
                   wait4path = callTest ./modules/nix-darwin/launchd/wait4path/tests/check.nix;
                 };
+                pki-keychain.check = callTest ./modules/nix-darwin/security/pki-keychain/tests/check.nix;
                 zsh.check = callTest ./modules/nix-darwin/programs/zsh/tests/check.nix;
                 linux-builder = config.packages.linux-builder.tests // {
                   module = callTest ./modules/nix-darwin/nix/linux-builder/tests/check.nix;

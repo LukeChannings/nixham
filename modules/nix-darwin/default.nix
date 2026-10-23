@@ -17,11 +17,13 @@ rec {
   linux-builder = module "linux-builder" ./nix/linux-builder [ oci-containers ];
   launchd-logging = module "launchd-logging" ./launchd/logging [ ];
   launchd-wait4path = module "launchd-wait4path" ./launchd/wait4path [ ];
+  pki-keychain = module "pki-keychain" ./security/pki-keychain [ ];
   zsh = module "zsh" ./programs/zsh [ ];
   default.imports = [
     launchd-logging
     launchd-wait4path
     linux-builder
+    pki-keychain
     zsh
   ];
 }

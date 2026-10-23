@@ -8,5 +8,6 @@
 - [launchd.logging](nix-darwin/launchd-logging.md)
 - [nix.linux-builder](nix-darwin/linux-builder.md)
 - [programs.zsh](nix-darwin/zsh.md)
+- [security.pki.keychainCertificates](nix-darwin/pki-keychain.md)
 - [virtualisation.apple-container](nix-darwin/apple-container.md)
 - [virtualisation.oci-containers](nix-darwin/oci-containers.md)

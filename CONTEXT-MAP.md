@@ -9,6 +9,7 @@ Nixham hosts many unrelated components (nix-darwin modules, NixOS modules, home-
 - [oci-containers](./modules/nix-darwin/virtualisation/oci-containers/CONTEXT.md) — declarative OCI containers for nix-darwin, built on apple-container; option-compatible with NixOS's `virtualisation.oci-containers`.
 - [linux-builder](./modules/nix-darwin/nix/linux-builder/CONTEXT.md) — a Linux Nix builder for macOS hosts, built on oci-containers. Spans `packages/linux-builder-image` (the image), `packages/linux-builder` (the ephemeral CLI), and `modules/nix-darwin/nix/linux-builder` (the resident nix-darwin module).
 - [launchd](./modules/nix-darwin/launchd/CONTEXT.md) — extensions of nix-darwin's launchd jobs: daemons that wait for a late-mounting store, and their logs.
+- [pki-keychain](./modules/nix-darwin/security/pki-keychain/CONTEXT.md) — CA certificates trusted in the macOS System keychain, as well as nix-darwin's OpenSSL bundle.
 
 ## Relationships
 
