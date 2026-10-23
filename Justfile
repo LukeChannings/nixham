@@ -60,6 +60,19 @@ _run KIND *ARGS:
     done
     exit "$status"
 
+# Regenerate the module options docs in docs/modules
+docs:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    out="$(nix-build --no-out-link -A docs.markdown)"
+    rm -rf docs/modules
+    cp -R "$out" docs/modules
+    chmod -R u+w docs/modules
+
+# Fail if docs/modules is out of date
+docs-check:
+    diff -ru docs/modules "$(nix-build --no-out-link -A docs.markdown)" || { echo 'docs/modules is stale: run `just docs`' >&2; exit 1; }
+
 # Build package NAME, e.g. `just build linux-builder`
 build NAME:
     nix-build -A {{ NAME }}

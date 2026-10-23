@@ -52,6 +52,12 @@
               apple-container-kernel = pkgs.callPackage ./packages/apple-container-kernel/package.nix {
                 inherit (pkgs) path;
               };
+              docs = pkgs.callPackage ./lib/docs {
+                nixham = self;
+                treefmt = config.treefmt.package;
+                treefmtConfig = config.treefmt.build.configFile;
+                revision = self.rev or null;
+              };
               linux-builder = pkgs.callPackage ./packages/linux-builder/package.nix {
                 nixham = self;
               };

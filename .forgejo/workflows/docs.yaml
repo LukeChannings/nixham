@@ -1,0 +1,24 @@
+---
+name: Docs
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    name: Check
+    runs-on: nixos-latest
+    steps:
+      - name: Checkout
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+          TOKEN: ${{ github.token }}
+        run: >-
+          git clone --depth 1 -b "${HEAD_REF:-$REF_NAME}"
+          "https://$TOKEN@forge.channings.me/$GITHUB_REPOSITORY.git" .
+      - uses: ./.forgejo/actions/setup-nix-shell
+      - name: Check docs are up to date
+        run: just docs-check
