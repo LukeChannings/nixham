@@ -5,8 +5,8 @@ Nixham (_/ˈnixəm/_) is a small hamlet containing Nix stuff that hasn't yet bee
 ## Geography
 
 - `modules/`
-  - `nixos/` - NixOS modules. Available under `modules.nixos`
-  - `nix-darwin/` - `nix-darwin` modules. Available under `modules.nix-darwin`
+  - `nixos/` - NixOS modules. Available under `modules.nixos` and `nixosModules`
+  - `nix-darwin/` - `nix-darwin` modules. Available under `modules.darwin` and `darwinModules`
 - `packages/` - Nix packages. Available under `packages.${platform}`
 - `profiles/` - compositions of modules and packages for my systems.
 - `.forgejo/actions/` - composite actions for GitHub and Forgejo
