@@ -10,5 +10,6 @@ let
 in
 rec {
   apple-container = module "apple-container" ./virtualisation/apple-container [ ];
-  default.imports = [ apple-container ];
+  oci-containers = module "oci-containers" ./virtualisation/oci-containers [ apple-container ];
+  default.imports = [ oci-containers ];
 }

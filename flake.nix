@@ -91,6 +91,10 @@
                   volumes-root = callTest (module + "/apple-container/tests/volumes-root.nix");
                   e2e = callTest (module + "/apple-container/tests/e2e.nix");
                 };
+                oci-containers = {
+                  check = callTest (module + "/oci-containers/tests/check.nix");
+                  e2e = callTest (module + "/oci-containers/tests/e2e.nix");
+                };
               }
               // lib.mapAttrs (_: p: p.tests) {
                 inherit (config.packages) apple-container-kernel linux-builder linux-builder-image;
