@@ -9,13 +9,11 @@ format:
 alias fmt := format
 
 # The flake's checks.treefmt output exists for CI, where a store copy
-# is acceptable; day to day, check the live tree instead.
+# is acceptable; day to day, lint the live tree instead.
 
-# Check the working tree directly (no store copy)
-check:
+# Lint the working tree directly (no store copy)
+lint:
     treefmt --ci
-
-alias lint := check
 
 # If the project distinguishes unit and integration tests, split into
 # `test-unit` and `test-integration` recipes and make `test` run both:

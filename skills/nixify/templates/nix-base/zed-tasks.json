@@ -1,6 +1,6 @@
 [
   { "label": "Build", "command": "just", "args": ["build"] },
-  { "label": "Check", "command": "just", "args": ["check"] },
+  { "label": "Lint", "command": "just", "args": ["lint"] },
   { "label": "Format", "command": "just", "args": ["format"] },
   { "label": "Test", "command": "just", "args": ["test"] },
   { "label": "Run", "command": "just", "args": ["run"] },

@@ -11,11 +11,11 @@ Templates are bundled under [`templates/`](templates/) (resolve relative to this
 
 **Core convention — flakes for inputs, vanilla nix for everything else.** The flake exists to pin inputs (`flake.lock`); day-to-day building and running goes through the flake-compat shim with `nix-build` / `nix-shell`, never `nix build` / `nix develop` / `nix flake check`. Flake commands copy the entire source tree to the store on every invocation, which is very expensive; `default.nix` sets `copySourceTreeToStore = false` to avoid exactly that. `.envrc` uses `use_nix` (not `use flake`) for the same reason. `nix flake lock` is fine — it only manages the lock file.
 
-**Common operations are standardised with [`just`](https://just.systems/man/).** `just` is a standard dependency in every devShell, and a `Justfile` provides stable recipe names wrapping the appropriate commands: `check` (alias `lint`), `build` (one package: `default`, or `just build <attr>`), `build-all` (every package), `run` (alias `start`), `format` (alias `fmt`), and `test`. When the project distinguishes unit from integration tests, add `test-unit` and `test-integration`, with `test` running both. Every recipe is discretionary: the names are standard, not their presence. Keep only those the project has a use for (no `run` when nothing is runnable, no `build` without packages, no `build-all` with only one), and drop the matching Zed task and CI workflow with them.
+**Common operations are standardised with [`just`](https://just.systems/man/).** `just` is a standard dependency in every devShell, and a `Justfile` provides stable recipe names wrapping the appropriate commands: `lint`, `build` (one package: `default`, or `just build <attr>`), `build-all` (every package), `run` (alias `start`), `format` (alias `fmt`), and `test`. When the project distinguishes unit from integration tests, add `test-unit` and `test-integration`, with `test` running both. Every recipe is discretionary: the names are standard, not their presence. Keep only those the project has a use for (no `run` when nothing is runnable, no `build` without packages, no `build-all` with only one), and drop the matching Zed task and CI workflow with them.
 
 Two meta recipes ride along: `worktree <issue> <slug>` creates a git worktree under `.worktrees/<issue>-<slug>/` on a matching branch and primes it via `init-worktree`. `init-worktree` is the single entry point for priming any new worktree/checkout: it copies `.env` from the main worktree (gitignored, so absent otherwise), then runs `direnv allow` + `direnv reload`.
 
-`.zed/tasks.json` maps whichever core recipes exist to Title-case task labels — `Build` → `just build`, `Check`, `Format`, `Test`, `Run` — never `just <recipe>` labels (those collide with the tasks Zed's `just` extension generates, duplicating every picker entry). Meta/parameterised recipes (`default`, `worktree`, `init-worktree`) are not mapped. The file also carries a [`create_worktree` hook](https://zed.dev/docs/tasks#hooks) running `just init-worktree $ZED_WORKTREE_ROOT`, so Zed-created worktrees are primed automatically.
+`.zed/tasks.json` maps whichever core recipes exist to Title-case task labels — `Build` → `just build`, `Lint`, `Format`, `Test`, `Run` — never `just <recipe>` labels (those collide with the tasks Zed's `just` extension generates, duplicating every picker entry). Meta/parameterised recipes (`default`, `worktree`, `init-worktree`) are not mapped. The file also carries a [`create_worktree` hook](https://zed.dev/docs/tasks#hooks) running `just init-worktree $ZED_WORKTREE_ROOT`, so Zed-created worktrees are primed automatically.
 
 ## Decide which scenario applies
 
@@ -46,7 +46,7 @@ Start from Scenario 1b, then:
 3. Extend `treefmt.nix` with formatters already used by the project — consult the treefmt-nix repo for available programs; don't introduce new formatters uninvited beyond the nix-base set.
 4. Fill in the `Justfile`: drop recipes the project has no use for, set the binary name in `run`, wire `test` to the project's test runner (splitting into `test-unit`/`test-integration` if the suite distinguishes them, with `test` running both), and adapt recipe bodies to the ecosystem's native commands where that's the better dev loop (e.g. `cargo test`) — but keep the recipe names stable, and keep `build`/`build-all` as `nix-build`s: the Build workflow runs one and pushes `./result*`.
 5. If the package is a daemon/service, offer an accompanying NixOS or nix-darwin module (pattern in [ECOSYSTEMS.md](ECOSYSTEMS.md)).
-6. Verify: every recipe kept (`just build`, `just check`, `just test`, …) and `nix-shell --run '<toolchain> --version'`.
+6. Verify: every recipe kept (`just build`, `just lint`, `just test`, …) and `nix-shell --run '<toolchain> --version'`.
 
 ## Scenario 3: Existing nix config
 
@@ -54,7 +54,7 @@ Audit the repo's config against nix-base conventions and converge. Full checklis
 
 ## CI workflows
 
-Every flake repo (scenarios 1b, 2, 3) gets Lint, Test, and Build workflows from [`templates/ci/`](templates/ci/), each only if what it wraps exists: drop `lint.yaml` without a `check` recipe, `test.yaml` without `test`. Read them before acting.
+Every flake repo (scenarios 1b, 2, 3) gets Lint, Test, and Build workflows from [`templates/ci/`](templates/ci/), each only if what it wraps exists: drop `lint.yaml` without a `lint` recipe, `test.yaml` without `test`. Read them before acting.
 
 1. Find the host from `git remote get-url origin`: `forge.channings.me` → Forgejo, `github.com` → GitHub. No remote, or another host → ask.
 2. Forgejo repo → ask whether it's mirrored to GitHub. If so, add both sets: Forgejo ignores `.github/workflows` when `.forgejo/workflows` exists, so nothing runs twice on the forge.
@@ -63,8 +63,8 @@ Every flake repo (scenarios 1b, 2, 3) gets Lint, Test, and Build workflows from 
 
 The workflows run on pushes to `main` and on PRs, each inside the repo's devshell (`devShells.ci`, else `devShells.default`), loaded once per job by nixham's [`setup-nix-shell`](https://forge.channings.me/hartlandia/nixham/src/branch/main/.forgejo/actions/setup-nix-shell) action:
 
-- **Lint** and **Test** run `just check` and `just test`, so the Justfile stays the single definition. `just check` lints the workflows themselves too (actionlint, yamllint, and `forgejo-runner validate` via the `forgejo-schema` formatter), so keep edits to them yamllint-clean.
-- Test suites that need host-only tooling (e.g. a macOS-only CLI) must skip — exit 0 with a message — when it's missing, so `just test` passes on the runners.
+- **Lint** and **Test** run `just lint` and `just test`, so the Justfile stays the single definition. `just lint` lints the workflows themselves too (actionlint, yamllint, and `forgejo-runner validate` via the `forgejo-schema` formatter), so keep edits to them yamllint-clean.
+- `just test` runs only tests that pass anywhere Nix does (in a flake, the `checks`). Tests that need the host (e.g. a macOS-only runtime) get their own recipe, never a skip inside `just test`.
 - **Build** runs `just build` (the default package), or `just build-all` (every `packages.<system>`) when the flake has several, and pushes the closures to `nix.channings.me` with nixham's [`niks3-push`](https://forge.channings.me/hartlandia/nixham/src/branch/main/.forgejo/actions/niks3-push) action (secret `NIKS3_CI_TOKEN`; fork PRs are skipped). Drop `build.yaml` if the flake has no packages. Pick `runs-on` to match the packages' system: Forgejo `nixos-latest` (`-x86_64`/`-arm64` to pin the arch, `macos-arm64` for darwin), GitHub `ubuntu-latest` / `ubuntu-24.04-arm` / `macos-latest`.
 - **Publish** (a job in `build.yaml`) pushes OCI images to a registry on `main` only, through nixham's [`oci-publish`](https://forge.channings.me/hartlandia/nixham/src/branch/main/.forgejo/actions/oci-publish) action: each image is tagged with its `imageTag` and `latest`, and built and pushed only when the registry lacks that tag, so an image is published only when its closure changes. Forgejo → `forge.channings.me/<owner>/<name>` (secret `FORGE_PAT`), GitHub → `ghcr.io/<owner>/<name>`. Their closures already reached `nix.channings.me` in Build, with everything else. If no package builds a container image, delete the job. Otherwise:
   - Add one matrix entry per image: `name` (registry image name), `attr` (`nix-build -A` attribute), `transport` (`oci-archive` for OCI archive tarballs, `docker-archive` for `dockerTools` images).
@@ -79,4 +79,4 @@ Vanilla commands only — see the core convention above.
 - [ ] Every recipe kept in the `Justfile` succeeds
 - [ ] `direnv allow` succeeds and loads the shell
 - [ ] nix files are git-tracked (if repo)
-- [ ] `just check` lints the workflows (actionlint, yamllint, forgejo-schema) — no separate linter runs needed
+- [ ] `just lint` lints the workflows (actionlint, yamllint, forgejo-schema) — no separate linter runs needed

@@ -22,4 +22,4 @@ jobs:
       # yamllint disable-line rule:line-length
       - uses: https://forge.channings.me/hartlandia/nixham/.forgejo/actions/setup-nix-shell@main
       - name: Lint
-        run: just check
+        run: just lint
