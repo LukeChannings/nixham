@@ -17,6 +17,7 @@ rec {
     launchd-wait4path
   ];
   linux-builder = module "linux-builder" ./nix/linux-builder [ oci-containers ];
+  garage = module "garage" ./services/garage [ ];
   launchd-logging = module "launchd-logging" ./launchd/logging [ ];
   launchd-wait4path = module "launchd-wait4path" ./launchd/wait4path [ ];
   virtual-interfaces = module "virtual-interfaces" ./networking/virtual-interfaces [ ];
@@ -24,6 +25,7 @@ rec {
   zsh = module "zsh" ./programs/zsh [ ];
   default.imports = [
     acme
+    garage
     launchd-logging
     launchd-wait4path
     linux-builder

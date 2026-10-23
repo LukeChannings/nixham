@@ -104,6 +104,7 @@
                   check = callTest (module + "/oci-containers/tests/check.nix");
                   e2e = callTest (module + "/oci-containers/tests/e2e.nix");
                 };
+                garage.check = callTest ./modules/nix-darwin/services/garage/tests/check.nix;
                 launchctl-completions = config.packages.launchctl-completions.tests;
                 launchd = {
                   logging = callTest ./modules/nix-darwin/launchd/logging/tests/check.nix;
