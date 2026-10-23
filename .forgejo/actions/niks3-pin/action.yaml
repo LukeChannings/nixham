@@ -1,0 +1,78 @@
+---
+name: niks3 pin
+description: >-
+  Create or update a named pin on a binary cache through niks3. The store
+  path is given directly (store_path) or resolved from an existing pin
+  (from_pin); a missing from_pin warns, outputs pinned=false and succeeds, so
+  callers decide whether that matters. Every niks3 call re-mints a fresh
+  token via niks3-push's token.sh and transient failures are retried, so
+  pinning works at the end of a job that outlives one ~15m access token or
+  that just restarted the niks3/IdP services themselves. Defaults target the
+  nix.channings.me fleet cache. Uses the niks3 on PATH, else the one in
+  nixham's nixpkgs.
+
+inputs:
+  token:
+    description: CI token exchanged (RFC 8693) for short-lived access tokens
+    required: true
+  name:
+    description: Pin name to create or update
+    required: true
+  store_path:
+    description: Store path to pin (mutually exclusive with from_pin)
+    required: false
+    default: ""
+  from_pin:
+    description: Existing pin whose store path to pin under name
+    required: false
+    default: ""
+  attempts:
+    description: Attempts before giving up on transient failures
+    required: false
+    default: "5"
+  server_url:
+    description: niks3 server URL
+    required: false
+    default: https://niks3.nix.channings.me
+  token_url:
+    description: OAuth2 token-exchange endpoint
+    required: false
+    default: https://id.channings.me/oauth2/token
+  client:
+    description: OAuth2 client used as both audience and client_id
+    required: false
+    default: niks3
+
+outputs:
+  pinned:
+    description: '"true" if the pin was created or updated, else "false"'
+    value: ${{ steps.pin.outputs.pinned }}
+  store_path:
+    description: The pinned store path (empty when from_pin was absent)
+    value: ${{ steps.pin.outputs.store_path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Pin on the niks3 server
+      id: pin
+      shell: bash
+      env:
+        NIKS3_CI_TOKEN: ${{ inputs.token }}
+        NIKS3_SERVER_URL: ${{ inputs.server_url }}
+        NIKS3_TOKEN_URL: ${{ inputs.token_url }}
+        NIKS3_CLIENT: ${{ inputs.client }}
+        action_path: ${{ github.action_path }}
+        PIN_NAME: ${{ inputs.name }}
+        STORE_PATH: ${{ inputs.store_path }}
+        FROM_PIN: ${{ inputs.from_pin }}
+        ATTEMPTS: ${{ inputs.attempts }}
+      run: |
+        set -euo pipefail
+        : "${NIKS3_CI_TOKEN:?the niks3-pin token input is empty}"
+        if ! command -v niks3 >/dev/null; then
+          NIKS3_BIN=$(nix-build --no-out-link \
+            "$action_path/../niks3-push/niks3.nix")/bin/niks3
+          export NIKS3_BIN
+        fi
+        "$BASH" "$action_path/pin.sh"
