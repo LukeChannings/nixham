@@ -102,6 +102,7 @@
                 };
                 litellm.check = callTest ./modules/nix-darwin/services/litellm/tests/check.nix;
                 nginx.check = callTest ./modules/nix-darwin/services/nginx/tests/check.nix;
+                ollama.check = callTest ./modules/nix-darwin/services/ollama/tests/check.nix;
                 oci-containers = {
                   check = callTest (module + "/oci-containers/tests/check.nix");
                   e2e = callTest (module + "/oci-containers/tests/e2e.nix");

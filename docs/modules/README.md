@@ -16,5 +16,6 @@
 - [services.garage](nix-darwin/garage.md)
 - [services.litellm](nix-darwin/litellm.md)
 - [services.nginx](nix-darwin/nginx.md)
+- [services.ollama](nix-darwin/ollama.md)
 - [virtualisation.apple-container](nix-darwin/apple-container.md)
 - [virtualisation.oci-containers](nix-darwin/oci-containers.md)

@@ -13,6 +13,7 @@ rec {
   alloy = module "alloy" ./services/monitoring/alloy [ ];
   apple-container = module "apple-container" ./virtualisation/apple-container [ ];
   nginx = module "nginx" ./services/nginx [ acme ];
+  ollama = module "ollama" ./services/ollama [ ];
   oci-containers = module "oci-containers" ./virtualisation/oci-containers [
     apple-container
     launchd-wait4path
@@ -36,6 +37,7 @@ rec {
     linux-builder
     litellm
     nginx
+    ollama
     pki-keychain
     virtual-interfaces
     zsh
