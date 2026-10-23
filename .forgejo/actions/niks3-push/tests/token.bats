@@ -29,6 +29,17 @@ EOF
   refute_output --partial ci-secret
 }
 
+@test "honours token endpoint and client overrides" {
+  export NIKS3_TOKEN_URL=https://sso.example/token NIKS3_CLIENT=cache
+  RESPONSE='{"access_token":"t","expires_in":900}' run bash "$token"
+
+  assert_success
+  run cat "$BATS_TEST_TMPDIR/curl.args"
+  assert_line https://sso.example/token
+  assert_line audience=cache
+  assert_line client_id=cache
+}
+
 @test "fails when the exchange returns no access token" {
   RESPONSE='{"error":"invalid_grant"}' run bash "$token"
 

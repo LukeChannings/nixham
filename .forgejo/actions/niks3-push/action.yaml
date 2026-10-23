@@ -1,26 +1,40 @@
 ---
 name: niks3 push
 description: >-
-  Push store paths and their closures to the nix.channings.me binary cache
-  through niks3, which signs on ingest. Uses the niks3 on PATH, else the one in
-  nixham's nixpkgs.
+  Push store paths and their closures to a binary cache through niks3, which
+  signs on ingest. Defaults target the nix.channings.me fleet cache. Uses the
+  niks3 on PATH, else the one in nixham's nixpkgs.
 
 inputs:
   token:
-    description: Kanidm API token of a niks3_ci group member
+    description: CI token exchanged (RFC 8693) for short-lived access tokens
     required: true
   paths:
     description: Whitespace-separated store paths to push
     required: true
+  server_url:
+    description: niks3 server URL
+    required: false
+    default: https://niks3.nix.channings.me
+  token_url:
+    description: OAuth2 token-exchange endpoint
+    required: false
+    default: https://id.channings.me/oauth2/token
+  client:
+    description: OAuth2 client used as both audience and client_id
+    required: false
+    default: niks3
 
 runs:
   using: composite
   steps:
-    - name: Push to nix.channings.me
+    - name: Push to the niks3 server
       shell: bash
       env:
         NIKS3_CI_TOKEN: ${{ inputs.token }}
-        NIKS3_SERVER_URL: https://niks3.nix.channings.me
+        NIKS3_SERVER_URL: ${{ inputs.server_url }}
+        NIKS3_TOKEN_URL: ${{ inputs.token_url }}
+        NIKS3_CLIENT: ${{ inputs.client }}
         action_path: ${{ github.action_path }}
         paths: ${{ inputs.paths }}
       run: |
