@@ -10,3 +10,6 @@ _Avoid_: wrapper, launcher
 
 **bare store-path daemon**:
 A daemon whose `Program` or `ProgramArguments[0]` is a /nix/store path, so launchd executes it without an entrypoint. Rejected unless it sets `allowBareStorePathProgram`.
+
+**log funnel**:
+`launchd.logging`: every daemon's and user agent's stdout and stderr default to `<directory>/<Label>.log`, created with the job's owner before launchd loads it, and rotated by newsyslog as that owner. A module's own log path, set with `mkOverride 1100`, is a fallback the funnel claims.

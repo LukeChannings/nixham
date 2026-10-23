@@ -46,10 +46,11 @@ let
         opt:
         let
           declarations = lib.filter (decl: hasPrefix "${module.dir}/" (relative decl)) opt.declarations;
+          upstream = lib.any (decl: !hasPrefix "${root}/" (toString decl)) opt.declarations;
         in
         opt
         // {
-          visible = opt.visible && declarations != [ ];
+          visible = opt.visible && declarations != [ ] && !upstream;
           declarations = map (decl: {
             url = url (relative decl);
             name = "<nixham/${relative decl}>";
@@ -59,6 +60,7 @@ let
 
   # For modules whose options' longest shared path isn't their namespace.
   namespaces = {
+    launchd-logging = "launchd.logging";
     launchd-wait4path = "launchd.*.waitForPaths";
     oci-containers = "virtualisation.oci-containers";
     zsh = "programs.zsh";

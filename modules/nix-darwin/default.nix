@@ -15,9 +15,11 @@ rec {
     launchd-wait4path
   ];
   linux-builder = module "linux-builder" ./nix/linux-builder [ oci-containers ];
+  launchd-logging = module "launchd-logging" ./launchd/logging [ ];
   launchd-wait4path = module "launchd-wait4path" ./launchd/wait4path [ ];
   zsh = module "zsh" ./programs/zsh [ ];
   default.imports = [
+    launchd-logging
     launchd-wait4path
     linux-builder
     zsh
