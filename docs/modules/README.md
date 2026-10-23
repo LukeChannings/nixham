@@ -9,6 +9,7 @@
 - [networking.virtualInterfaces](nix-darwin/virtual-interfaces.md)
 - [nix.linux-builder](nix-darwin/linux-builder.md)
 - [programs.zsh](nix-darwin/zsh.md)
+- [security.acme](nix-darwin/acme.md)
 - [security.pki.keychainCertificates](nix-darwin/pki-keychain.md)
 - [virtualisation.apple-container](nix-darwin/apple-container.md)
 - [virtualisation.oci-containers](nix-darwin/oci-containers.md)

@@ -9,6 +9,7 @@ let
   };
 in
 rec {
+  acme = module "acme" ./security/acme [ ];
   apple-container = module "apple-container" ./virtualisation/apple-container [ ];
   oci-containers = module "oci-containers" ./virtualisation/oci-containers [
     apple-container
@@ -21,6 +22,7 @@ rec {
   pki-keychain = module "pki-keychain" ./security/pki-keychain [ ];
   zsh = module "zsh" ./programs/zsh [ ];
   default.imports = [
+    acme
     launchd-logging
     launchd-wait4path
     linux-builder

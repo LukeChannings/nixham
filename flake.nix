@@ -93,6 +93,7 @@
                 niks3-push.check = callTest ./.forgejo/actions/niks3-push/tests/check.nix;
                 oci-publish.check = callTest ./.forgejo/actions/oci-publish/tests/check.nix;
                 setup-nix-shell.check = callTest ./.forgejo/actions/setup-nix-shell/tests/check.nix;
+                acme.check = callTest ./modules/nix-darwin/security/acme/tests/check.nix;
                 apple-container = {
                   check = callTest (module + "/apple-container/tests/check.nix");
                   volumes-root = callTest (module + "/apple-container/tests/volumes-root.nix");
