@@ -73,14 +73,24 @@
                     // config.packages
                     // {
                       inherit (testing) makeTest;
+                      darwin = pkgs.callPackage ./lib/testing/nix-darwin.nix {
+                        inherit (inputs) nix-darwin;
+                        inherit (self) darwinModules;
+                      };
                     }
                   ) path { };
+                module = ./modules/nix-darwin/virtualisation;
               in
               {
                 niks3-pin.check = callTest ./.forgejo/actions/niks3-pin/tests/check.nix;
                 niks3-push.check = callTest ./.forgejo/actions/niks3-push/tests/check.nix;
                 oci-publish.check = callTest ./.forgejo/actions/oci-publish/tests/check.nix;
                 setup-nix-shell.check = callTest ./.forgejo/actions/setup-nix-shell/tests/check.nix;
+                apple-container = {
+                  check = callTest (module + "/apple-container/tests/check.nix");
+                  volumes-root = callTest (module + "/apple-container/tests/volumes-root.nix");
+                  e2e = callTest (module + "/apple-container/tests/e2e.nix");
+                };
               }
               // lib.mapAttrs (_: p: p.tests) {
                 inherit (config.packages) apple-container-kernel linux-builder linux-builder-image;
