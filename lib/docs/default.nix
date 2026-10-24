@@ -57,6 +57,16 @@ let
         };
     };
 
+  # For modules whose options' longest shared path isn't their namespace.
+  namespaces.oci-containers = "virtualisation.oci-containers";
+  namespace =
+    m:
+    let
+      locs = map (opt: opt.loc) (lib.attrValues (optionsDoc m forgeUrl).optionsNix);
+    in
+    namespaces.${m.name}
+      or (lib.concatStringsSep "." (lib.foldl' lib.lists.commonPrefix (lib.head locs) locs));
+
   rev = if revision == null then "main" else revision;
   forgeUrl =
     file:
@@ -73,7 +83,7 @@ let
 
     ## nix-darwin
 
-    ${concatMapStrings (m: "- [${m.name}](${m.file})\n") modules}
+    ${concatMapStrings (m: "- [${namespace m}](${m.file})\n") (lib.sortOn namespace modules)}
   '';
 
   markdown = runCommand "nixham-options-markdown" { nativeBuildInputs = [ treefmt ]; } ''
