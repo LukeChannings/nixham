@@ -1,6 +1,6 @@
 # Runs from the root volume, before /nix mounts (see launchd's ADR-0001).
-# Expects $state_dir, $uplinks ("<tag> <parent>" lines) and $legs
-# ("<feth> <peer> <tag> <parent> <mac> <dhcp> <ipv6>" lines).
+# Expects $state_dir, $uplinks ("<tag> <parent>" lines), $legs
+# ("<feth> <peer> <tag> <parent> <mac> <dhcp> <ipv6>" lines) and $stable_v6.
 
 log() {
   echo "virtual-interfaces: $*" >&2
@@ -27,6 +27,13 @@ is_leased() {
 # appears when the RA is managed.
 has_v6() {
   ifconfig "$1" 2>/dev/null | grep -q "inet6 fe80:"
+}
+
+# Temporary addresses regenerate on every re-arm, stranding established
+# connections sourced from them; stable (RFC 7217) addresses re-form
+# identically.
+v6_source_ok() {
+  [ "$stable_v6" = 0 ] || [ "$(sysctl -n net.inet6.ip6.prefer_tempaddr)" = 0 ]
 }
 
 # vlan_ok <vlan-if> <tag> <parent>
@@ -226,6 +233,11 @@ ensure_leg() {
   echo "$l_spec" >"$state_dir/$l_host"
   return "$l_status"
 }
+
+if ! v6_source_ok; then
+  log "preferring stable IPv6 source addresses"
+  sysctl -w net.inet6.ip6.prefer_tempaddr=0 >/dev/null
+fi
 
 healthy && exit 0
 

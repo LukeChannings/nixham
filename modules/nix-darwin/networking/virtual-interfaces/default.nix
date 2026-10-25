@@ -7,6 +7,7 @@ _nixham:
 }:
 let
   inherit (lib)
+    any
     attrNames
     concatMapStringsSep
     concatStringsSep
@@ -60,6 +61,7 @@ let
     PATH=/usr/bin:/bin:/usr/sbin:/sbin
     export PATH
     state_dir=${stateDir}
+    stable_v6=${b2s (any (l: l.ipv6 == "1") legs)}
     uplinks='${concatMapStringsSep "\n" (u: "${u.tag} ${u.parent}") uplinks}'
     legs='${
       concatMapStringsSep "\n" (
@@ -122,6 +124,11 @@ let
           managed RA this takes a stateful DHCPv6 address; macOS SLAAC only
           forms RFC 7217 identifiers, never EUI-64. Without one the leg gets
           only SLAAC and link-local addresses.
+
+          Any leg with IPv6 also pins the host to stable source addresses
+          (`net.inet6.ip6.prefer_tempaddr=0`): temporary addresses
+          regenerate every time a leg is re-armed, stranding established
+          connections sourced from them.
         '';
       };
     };

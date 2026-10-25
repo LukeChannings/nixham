@@ -53,6 +53,7 @@ let
       [ -e "$FAKE_NET/feth50/v6" ] && [ ! -e "$FAKE_NET/feth52/v6" ] && [ -e "$FAKE_NET/feth60/v6" ]
       [ -e "$FAKE_NET/feth60/up" ] && [ ! -e "$FAKE_NET/feth60/lease" ]
       run ! grep -q "ipconfig set feth60 DHCP" "$FAKE_LOG"
+      assert_equal "$(cat "$FAKE_SYSCTL")" 0
     '';
     "a healthy tick changes and logs nothing" = ''
       vi
@@ -74,6 +75,15 @@ let
       grep -q "ipconfig set feth50 AUTOMATIC-V6" "$FAKE_LOG"
       run ! grep -q "ipconfig set feth52" "$FAKE_LOG"
       run ! grep -q create "$FAKE_LOG"
+    '';
+    "a reverted prefer_tempaddr is repinned without a replumb" = ''
+      vi
+      echo 1 >"$FAKE_SYSCTL"
+      : >"$FAKE_LOG"
+      vi
+      assert_equal "$(cat "$FAKE_SYSCTL")" 0
+      assert_equal "$(grep -v '^sysctl' "$FAKE_LOG")" ""
+      grep -q "preferring stable IPv6 source addresses" "$BATS_TEST_TMPDIR/stderr"
     '';
     "a lost IPv6 service is re-armed alone" = ''
       vi
@@ -138,6 +148,7 @@ makeTest {
     sed -e "s|^PATH=.*|PATH=$PATH|" -e "s|^state_dir=.*|state_dir=$BATS_TEST_TMPDIR/state|" \
       ${script} >"$BATS_TEST_TMPDIR/virtual-interfaces"
     export FAKE_NET="$BATS_TEST_TMPDIR/net" FAKE_LOG="$BATS_TEST_TMPDIR/log"
+    export FAKE_SYSCTL="$BATS_TEST_TMPDIR/sysctl"
     mkdir -p "$FAKE_NET/en0" "$FAKE_NET/en1"
     touch "$FAKE_NET/en0/up" "$FAKE_NET/en1/up" "$FAKE_LOG"
   '';
@@ -167,7 +178,24 @@ makeTest {
       assert_line --partial 'feth50 feth51 40 en0 02:4c:4c:4d:00:01 1 1'
       assert_line --partial 'feth52 feth53 40 en0 02:47:52:47:00:01 1 0'
       assert_line --partial 'feth60 feth61 41 en1 02:00:00:00:00:60 0 1'
+      assert_line 'stable_v6=1'
       dash -n ${script}
+    '';
+    "without an IPv6 leg the sysctl is left alone" = ''
+      run cat ${
+        text "no-v6-script"
+          (darwin.eval [
+            {
+              networking.virtualInterfaces.feth50 = {
+                parent = "en0";
+                vlanId = 40;
+                macAddress = "02:00:00:00:00:01";
+                ipv6 = false;
+              };
+            }
+          ]).config.system.build.virtualInterfaces.text
+      }
+      assert_line 'stable_v6=0'
     '';
     "without legs, there is no daemon" = ''
       assert_equal ${json ((darwin.eval [ ]).config.launchd.daemons ? virtual-interfaces)} false
