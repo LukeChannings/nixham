@@ -5,8 +5,8 @@
 ## launchd.logging.enable
 
 Whether to enable funnelling every `launchd.daemons` and `launchd.user.agents` job’s
-stdout and stderr into `<directory>/<Label>.log`, rotated by
-`system.newsyslog`.
+stdout and stderr into `<directory>/<Label>.log`, rotated in
+place by the `launchd-log-rotate` daemon.
 
 launchd discards a job’s output unless it names a file. With this
 enabled, each job’s `StandardOutPath` and `StandardErrorPath`
@@ -90,10 +90,10 @@ list of string
 
 ## launchd.logging.rotation.count
 
-Number of rotated archives newsyslog keeps per log file.
+Number of bzip2 archives kept per log file, named `<log>.0.bz2` onwards.
 
 *Type:*
-unsigned integer, meaning >=0
+positive integer, meaning >0
 
 *Default:*
 
@@ -105,24 +105,23 @@ unsigned integer, meaning >=0
 
 - [\<nixham/modules/nix-darwin/launchd/logging/default.nix>](../../../modules/nix-darwin/launchd/logging/default.nix)
 
-## launchd.logging.rotation.flags
+## launchd.logging.rotation.intervalSeconds
 
-newsyslog flags for each log file: by default, compress with
-bzip2 (`J`) and don’t signal syslogd (`N`), which isn’t the writer.
+How often every log file’s size is checked.
 
-launchd jobs can’t reopen their stdio, so a long-running job
-writes to the rotated file until it is next spawned.
+Rotation copies the log, truncates it in place and compresses
+the copy, rather than renaming it away: launchd opens a job’s
+stdio once, at spawn, and no job can reopen it, so a renamed log
+is one the daemon keeps writing to until it next spawns. Only
+the lines written during the copy are lost.
 
 *Type:*
-list of string
+positive integer, meaning >0
 
 *Default:*
 
 ```nix
-[
-  "J"
-  "N"
-]
+900
 ```
 
 *Declared by:*
@@ -131,38 +130,15 @@ list of string
 
 ## launchd.logging.rotation.size
 
-Size in KB at which newsyslog rotates a log file, or `null` not to rotate by size.
+Size in KB a log file has to reach to be archived and truncated.
 
 *Type:*
-null or string
+positive integer, meaning >0
 
 *Default:*
 
 ```nix
-"1024"
-```
-
-*Declared by:*
-
-- [\<nixham/modules/nix-darwin/launchd/logging/default.nix>](../../../modules/nix-darwin/launchd/logging/default.nix)
-
-## launchd.logging.rotation.when
-
-newsyslog’s schedule for rotating a log file, or `null` not to rotate by time.
-
-*Type:*
-null or string
-
-*Default:*
-
-```nix
-null
-```
-
-*Example:*
-
-```nix
-"@T00"
+1024
 ```
 
 *Declared by:*
@@ -195,8 +171,7 @@ Owner of this agent’s log file under `launchd.logging.directory`.
 
 launchd opens it as the session’s user, and fails the spawn
 (`EX_CONFIG`) if that user can’t. Activation creates it with this
-owner, and newsyslog recreates it with the same owner after
-rotation.
+owner; rotation truncates it in place, so it keeps that owner.
 
 *Type:*
 string

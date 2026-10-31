@@ -2,6 +2,7 @@ _nixham:
 {
   config,
   lib,
+  pkgs,
   ...
 }:
 let
@@ -73,8 +74,7 @@ let
 
           launchd opens it as the session's user, and fails the spawn
           (`EX_CONFIG`) if that user can't. Activation creates it with this
-          owner, and newsyslog recreates it with the same owner after
-          rotation.
+          owner; rotation truncates it in place, so it keeps that owner.
         '';
       };
 
@@ -123,14 +123,25 @@ let
   );
 
   logFiles = mapAttrsToList (_: head) filesByPath;
+
+  rotator = pkgs.writeScript "launchd-log-rotate" ''
+    #!/bin/sh
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    export PATH
+    set -u
+    dir=${escapeShellArg cfg.directory}
+    limit=$((${toString cfg.rotation.size} * 1024))
+    keep=${toString cfg.rotation.count}
+    ${builtins.readFile ./rotate.sh}
+  '';
 in
 {
   options.launchd = {
     logging = {
       enable = mkEnableOption ''
         funnelling every `launchd.daemons` and `launchd.user.agents` job's
-        stdout and stderr into {file}`<directory>/<Label>.log`, rotated by
-        {option}`system.newsyslog`.
+        stdout and stderr into {file}`<directory>/<Label>.log`, rotated in
+        place by the `launchd-log-rotate` daemon.
 
         launchd discards a job's output unless it names a file. With this
         enabled, each job's `StandardOutPath` and `StandardErrorPath`
@@ -170,36 +181,28 @@ in
 
       rotation = {
         count = mkOption {
-          type = types.ints.unsigned;
+          type = types.ints.positive;
           default = 5;
-          description = "Number of rotated archives newsyslog keeps per log file.";
+          description = "Number of bzip2 archives kept per log file, named {file}`<log>.0.bz2` onwards.";
         };
 
         size = mkOption {
-          type = types.nullOr types.str;
-          default = "1024";
-          description = "Size in KB at which newsyslog rotates a log file, or `null` not to rotate by size.";
+          type = types.ints.positive;
+          default = 1024;
+          description = "Size in KB a log file has to reach to be archived and truncated.";
         };
 
-        when = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          example = "@T00";
-          description = "newsyslog's schedule for rotating a log file, or `null` not to rotate by time.";
-        };
-
-        flags = mkOption {
-          type = types.listOf types.str;
-          default = [
-            "J"
-            "N"
-          ];
+        intervalSeconds = mkOption {
+          type = types.ints.positive;
+          default = 900;
           description = ''
-            newsyslog flags for each log file: by default, compress with
-            bzip2 (`J`) and don't signal syslogd (`N`), which isn't the writer.
+            How often every log file's size is checked.
 
-            launchd jobs can't reopen their stdio, so a long-running job
-            writes to the rotated file until it is next spawned.
+            Rotation copies the log, truncates it in place and compresses
+            the copy, rather than renaming it away: launchd opens a job's
+            stdio once, at spawn, and no job can reopen it, so a renamed log
+            is one the daemon keeps writing to until it next spawns. Only
+            the lines written during the copy are lost.
           '';
         };
       };
@@ -250,19 +253,11 @@ in
       fi
     '';
 
-    # Without an owner, newsyslog recreates the file as root, and a
-    # non-root job's next spawn fails.
-    system.newsyslog.enable = true;
-    system.newsyslog.files.launchd-logging = map (f: {
-      logfilename = f.path;
-      inherit (f) owner group;
-      mode = "644";
-      inherit (cfg.rotation)
-        count
-        size
-        when
-        flags
-        ;
-    }) logFiles;
+    system.build.launchdLogRotate = rotator;
+
+    launchd.daemons.launchd-log-rotate = {
+      command = "${rotator}";
+      serviceConfig.StartInterval = cfg.rotation.intervalSeconds;
+    };
   };
 }

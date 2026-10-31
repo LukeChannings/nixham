@@ -2,9 +2,10 @@
   lib,
   makeTest,
   darwin,
+  bzip2,
 }:
 let
-  inherit (darwin) json text;
+  inherit (darwin) esc json text;
   s = darwin.eval [
     {
       launchd.logging = {
@@ -85,18 +86,35 @@ let
       job.serviceConfig.StandardErrorPath
     ];
   activation = s: text "activation" s.config.system.activationScripts.script.text;
-  newsyslog = s: text "newsyslog" s.config.environment.etc."newsyslog.d/launchd-logging.conf".text;
+  rotate = s: text "launchd-log-rotate" s.config.system.build.launchdLogRotate.text;
+  rotateDaemon = s.daemon "launchd-log-rotate";
 in
 makeTest {
   name = "launchd-logging";
+  inputs = [ bzip2 ];
   helpers = [
     ''
-      # rotated <file> <log> <owner:group>: <file> rotates <log> as its owner.
-      rotated() {
-        grep -qxF "$(printf '%s\t%s\t644\t5\t1024\t*\tJN' "$2" "$3")" "$1" || fail "$2 is not rotated as $3"
+      # log <name> <kb>: a log file of <kb> kilobytes.
+      log() {
+        head -c $(($2 * 1024)) /dev/zero >"$DIR/$1.log"
+      }
+
+      inode() {
+        stat -c %i "$1"
+      }
+
+      kept() {
+        (cd "$DIR" && echo *)
       }
     ''
   ];
+  setup = ''
+    export DIR="$BATS_TEST_TMPDIR/logs"
+    mkdir -p "$DIR"
+    sed -e "s|^PATH=.*|PATH=$PATH|" -e "s|^dir=.*|dir='$DIR'|" \
+      ${rotate s} >"$BATS_TEST_TMPDIR/rotate"
+    chmod +x "$BATS_TEST_TMPDIR/rotate"
+  '';
   tests = {
     "the fixtures pass every assertion" = ''
       assert_equal ${json (s.failedAssertions ++ managed.failedAssertions)} '[]'
@@ -139,17 +157,54 @@ makeTest {
       assert_output --partial 'could not create /var/log/launchd/org.nixos.foo.log owned by root:wheel'
       assert_output --partial 'aborting before loading launchd jobs'
     '';
-    "log files are rotated as their owners" = ''
-      rotated ${newsyslog s} /var/log/launchd/org.nixos.foo.log root:wheel
-      rotated ${newsyslog s} /var/log/launchd/org.nixos.bar.log _bar:_bar
-      rotated ${newsyslog s} /var/log/launchd/org.nixos.baz.log alice:staff
-      rotated ${newsyslog s} /var/log/launchd/org.nixos.qux.log other-user:other-group
-      run grep -E '/var/log/pinned.log|excluded|inetd' ${newsyslog s}
-      assert_failure
+    "the rotator runs over the log directory, on the configured interval" = ''
+      assert_equal ${json rotateDaemon.serviceConfig.StartInterval} 900
+      assert_equal ${esc rotateDaemon.command} ${esc s.config.system.build.launchdLogRotate}
+      run cat ${rotate s}
+      assert_line --index 0 '#!/bin/sh'
+      assert_line 'dir=/var/log/launchd'
+      assert_line 'limit=$((1024 * 1024))'
+      assert_line 'keep=5'
+    '';
+    "a log under the threshold is left alone" = ''
+      log small 1023
+      "$BATS_TEST_TMPDIR/rotate"
+      assert_equal "$(kept)" 'small.log'
+    '';
+    "an oversized log is archived, and keeps the inode its daemon holds" = ''
+      log big 1024
+      before="$(inode "$DIR/big.log")"
+      "$BATS_TEST_TMPDIR/rotate"
+      assert_equal "$(kept)" 'big.log big.log.0.bz2'
+      assert_equal "$(inode "$DIR/big.log")" "$before"
+      assert_equal "$(wc -c <"$DIR/big.log")" 0
+      assert_equal "$(bzip2 -dc "$DIR/big.log.0.bz2" | wc -c)" $((1024 * 1024))
+    '';
+    "an archive keeps the mode of the log it came from" = ''
+      log big 1024
+      chmod 600 "$DIR/big.log"
+      "$BATS_TEST_TMPDIR/rotate"
+      assert_equal "$(stat -c %a "$DIR/big.log.0.bz2")" 600
+    '';
+    "archives shift down the chain, and the oldest is dropped" = ''
+      for i in 0 1 2 3 4; do echo "archive $i" | bzip2 >"$DIR/big.log.$i.bz2"; done
+      log big 1024
+      "$BATS_TEST_TMPDIR/rotate"
+      assert_equal "$(kept)" 'big.log big.log.0.bz2 big.log.1.bz2 big.log.2.bz2 big.log.3.bz2 big.log.4.bz2'
+      assert_equal "$(bzip2 -dc "$DIR/big.log.4.bz2")" 'archive 3'
+      assert_equal "$(bzip2 -dc "$DIR/big.log.1.bz2")" 'archive 0'
     '';
     "an agent's group is a managed primary user's gid, unless it says otherwise" = ''
-      rotated ${newsyslog managed} /var/log/launchd/org.nixos.baz.log alice:4242
-      rotated ${newsyslog managed} /var/log/launchd/org.nixos.qux.log alice:other-group
+      run cat ${activation managed}
+      assert_output --partial 'chown alice:4242 /var/log/launchd/org.nixos.baz.log'
+      assert_output --partial 'chown alice:other-group /var/log/launchd/org.nixos.qux.log'
+    '';
+    "only <Label>.log is rotated" = ''
+      log big 1024
+      cp "$DIR/big.log" "$DIR/big.log.1"
+      cp "$DIR/big.log" "$DIR/notalog"
+      "$BATS_TEST_TMPDIR/rotate"
+      assert_equal "$(kept)" 'big.log big.log.0.bz2 big.log.1 notalog'
     '';
     "a log file written by jobs with different owners is rejected" = ''
       run echo ${json shared.failedAssertions}

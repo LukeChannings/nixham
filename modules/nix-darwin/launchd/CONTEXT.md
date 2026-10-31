@@ -12,4 +12,7 @@ _Avoid_: wrapper, launcher
 A daemon whose `Program` or `ProgramArguments[0]` is a /nix/store path, so launchd executes it without an entrypoint. Rejected unless it sets `allowBareStorePathProgram`.
 
 **log funnel**:
-`launchd.logging`: every daemon's and user agent's stdout and stderr default to `<directory>/<Label>.log`, created with the job's owner before launchd loads it, and rotated by newsyslog as that owner. A module's own log path, set with `mkOverride 1100`, is a fallback the funnel claims.
+`launchd.logging`: every daemon's and user agent's stdout and stderr default to `<directory>/<Label>.log`, created with the job's owner before launchd loads it. A module's own log path, set with `mkOverride 1100`, is a fallback the funnel claims.
+
+**copy-truncate rotation**:
+How the funnel keeps a log bounded: `launchd-log-rotate` copies the log, truncates it in place and compresses the copy to `<log>.0.bz2`. launchd opens a job's stdio once, at spawn, and no job can reopen it, so renaming a log away (as newsyslog does) leaves the daemon writing to an inode nothing reads.
