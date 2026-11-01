@@ -10,6 +10,7 @@ Nixham hosts many unrelated components (nix-darwin modules, NixOS modules, home-
 - [linux-builder](./modules/nix-darwin/nix/linux-builder/CONTEXT.md) — a Linux Nix builder for macOS hosts, built on oci-containers. Spans `packages/linux-builder-image` (the image), `packages/linux-builder` (the ephemeral CLI), and `modules/nix-darwin/nix/linux-builder` (the resident nix-darwin module).
 - [launchd](./modules/nix-darwin/launchd/CONTEXT.md) — extensions of nix-darwin's launchd jobs: daemons that wait for a late-mounting store, and their logs.
 - [pki-keychain](./modules/nix-darwin/security/pki-keychain/CONTEXT.md) — CA certificates trusted in the macOS System keychain, as well as nix-darwin's OpenSSL bundle.
+- [forge-ci](./.forgejo/CONTEXT.md) — composite actions and workflows shared by hartlandia's forge repos: binary-cache pushes, devshells, image publishing, and keeping forks in step with their upstream.
 - [virtual-interfaces](./modules/nix-darwin/networking/virtual-interfaces/CONTEXT.md) — per-service network interfaces, each with its own MAC address and lease on a tagged VLAN.
 
 ## Relationships

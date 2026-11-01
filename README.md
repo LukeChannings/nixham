@@ -14,9 +14,34 @@ Nixham (_/ˈnixəm/_) is a small hamlet containing Nix stuff that hasn't yet bee
   - `substituter/` - substitute from `nix.channings.me`
   - `niks3-push/` - push store paths to `nix.channings.me` through niks3
   - `oci-publish/` - push an image to a registry when its closure changes
+  - `upstream-sync/` - bring a fork's upstream commits in through a PR
+
+## Syncing a fork with its upstream
+
+A forge repo forked from an upstream calls `upstream-sync` on a schedule:
+
+```yaml
+"on":
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: nixos-latest
+    steps:
+      - uses: https://forge.channings.me/hartlandia/nixham/.forgejo/actions/upstream-sync@main
+        with:
+          upstream: https://github.com/kaiT2en/KaiT2en-Fedora
+          token: ${{ secrets.FORGE_PAT }}
+          signing_key: ${{ secrets.SIGNING_KEY }}
+```
 
 ## History
 
 - I build a lot of custom modules and packages for my systems.
 - I don't want to wait for nixpkgs / nix-darwin / home-manager, and I don't want to maintain a permanent fork
 - I sometimes have experimental modules that I don't want to upstream, this is a home for them
+
+```
+```

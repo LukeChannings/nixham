@@ -1,0 +1,57 @@
+---
+name: Upstream sync
+description: >-
+  Bring the upstream's new commits into this forge repo through a sync PR
+  (.forgejo/CONTEXT.md): merge them into the sync branch with a signed merge
+  commit, and open a PR to the default branch if none is open. A merge that
+  conflicts is left to a person: a new sync branch starts at upstream's head,
+  an existing one is untouched, and the PR gets a comment naming the
+  conflicting paths. Pushes with token, not github.token, so the push
+  triggers the repo's workflows. Uses git, curl, jq and ssh-keygen from
+  nixham's nixpkgs.
+
+inputs:
+  upstream:
+    description: Git URL of the upstream
+    required: true
+  branch:
+    description: The upstream's branch to sync
+    required: false
+    default: HEAD
+  sync_branch:
+    description: Branch the sync PR is opened from
+    required: false
+    default: sync/upstream
+  token:
+    description: A user's PAT that can push and open PRs
+    required: true
+  signing_key:
+    description: SSH private key, verified on the committer's forge account
+    required: true
+  committer_name:
+    description: Name the merge commits are made under
+    required: false
+    default: Hartlandia Bot
+  committer_email:
+    description: Email of the forge account the signing key is verified on
+    required: false
+    default: hartlandia-bot@forge.channings.me
+
+runs:
+  using: composite
+  steps:
+    - name: Sync with ${{ inputs.upstream }}
+      shell: bash
+      env:
+        action_path: ${{ github.action_path }}
+        UPSTREAM: ${{ inputs.upstream }}
+        UPSTREAM_BRANCH: ${{ inputs.branch }}
+        SYNC_BRANCH: ${{ inputs.sync_branch }}
+        FORGE_TOKEN: ${{ inputs.token }}
+        SIGNING_KEY: ${{ inputs.signing_key }}
+        GIT_NAME: ${{ inputs.committer_name }}
+        GIT_EMAIL: ${{ inputs.committer_email }}
+      run: |
+        set -euo pipefail
+        PATH=$(nix-build --no-out-link "$action_path/tools.nix")/bin:$PATH
+        "$BASH" "$action_path/sync.sh"

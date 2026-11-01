@@ -93,6 +93,7 @@
                 niks3-push.check = callTest ./.forgejo/actions/niks3-push/tests/check.nix;
                 oci-publish.check = callTest ./.forgejo/actions/oci-publish/tests/check.nix;
                 setup-nix-shell.check = callTest ./.forgejo/actions/setup-nix-shell/tests/check.nix;
+                upstream-sync.check = callTest ./.forgejo/actions/upstream-sync/tests/check.nix;
                 acme.check = callTest ./modules/nix-darwin/security/acme/tests/check.nix;
                 alloy.check = callTest ./modules/nix-darwin/services/monitoring/alloy/tests/check.nix;
                 apple-container = {
