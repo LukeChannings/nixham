@@ -90,18 +90,20 @@ makeTest {
       run grep -c '^POST pulls' "$BATS_TEST_TMPDIR/curl.calls"
       assert_output 1
     '';
-    "opens the PR at upstream's head when the merge conflicts" = ''
+    # The sync branch must never be reset to upstream's head: its PR would then
+    # delete every path the fork has and upstream does not.
+    "pushes nothing and fails when the first merge conflicts" = ''
       commit "$dev" a.txt ours
       git -C "$dev" push -q
       commit "$up" a.txt theirs
 
       run bash ${../sync.sh}
 
-      assert_success
-      assert_equal "$(sync_head)" "$(git -C "$up" rev-parse HEAD)"
-      run calls
-      assert_line --regexp '^POST pulls '
-      assert_line --regexp '^POST issues/1/comments .*a\.txt'
+      assert_failure
+      assert_output --partial a.txt
+      run git -C "$forge" rev-parse -q --verify sync/upstream
+      assert_failure
+      assert_equal "$(calls)" ""
     '';
     "leaves a conflicting sync branch alone, commenting once per upstream head" = ''
       commit "$up" b.txt two
@@ -116,6 +118,8 @@ makeTest {
 
       assert_success
       assert_equal "$(sync_head)" "$pushed"
+      run git -C "$forge" cat-file -e sync/upstream:fork.txt
+      assert_success
       run calls
       assert_line --regexp '^POST issues/7/comments .*a\.txt'
 
@@ -140,6 +144,20 @@ makeTest {
       assert_equal "$(sync_head ^1)" "$(git -C "$forge" rev-parse main)"
       run grep -c '^POST pulls' "$BATS_TEST_TMPDIR/curl.calls"
       assert_output 2
+    '';
+    "names the conflicts in the log when the forge rejects the comment" = ''
+      commit "$up" b.txt two
+      bash ${../sync.sh}
+      on_sync_branch
+      commit "$dev" a.txt ours
+      git -C "$dev" push -q
+      commit "$up" a.txt theirs
+
+      PULLS=$open_pr DENY_COMMENTS=1 run bash ${../sync.sh}
+
+      assert_failure
+      assert_output --partial a.txt
+      assert_output --partial 'write:issue'
     '';
     "refuses to make unsigned merges" = ''
       commit "$up" b.txt two

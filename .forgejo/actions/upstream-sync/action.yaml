@@ -4,9 +4,9 @@ description: >-
   Bring the upstream's new commits into this forge repo through a sync PR
   (.forgejo/CONTEXT.md): merge them into the sync branch with a signed merge
   commit, and open a PR to the default branch if none is open. A merge that
-  conflicts is left to a person: a new sync branch starts at upstream's head,
-  an existing one is untouched, and the PR gets a comment naming the
-  conflicting paths. Pushes with token, not github.token, so the push
+  conflicts is left to a person: nothing is pushed, an existing sync branch is
+  untouched, and the conflicting paths go to the job log plus a comment on the
+  sync PR when one is open. Pushes with token, not github.token, so the push
   triggers the repo's workflows. Uses git, curl, jq and ssh-keygen from
   nixham's nixpkgs.
 

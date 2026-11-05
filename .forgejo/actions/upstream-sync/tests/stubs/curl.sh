@@ -14,6 +14,12 @@ case "$method $path" in
 "GET pulls?"*) printf '%s' "${PULLS:-[]}" ;;
 "GET issues/"*/comments) printf '%s' "${COMMENTS:-[]}" ;;
 "POST pulls") printf '{"number":1}' ;;
-"POST issues/"*/comments) printf '{}' ;;
+"POST issues/"*/comments)
+  [ -z "${DENY_COMMENTS:-}" ] || {
+    printf '{"message":"token does not have at least one of required scope(s): [write:issue]"}'
+    exit 22
+  }
+  printf '{}'
+  ;;
 *) exit 22 ;;
 esac
