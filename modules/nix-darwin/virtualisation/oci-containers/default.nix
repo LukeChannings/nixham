@@ -14,7 +14,6 @@ let
     attrNames
     concatMap
     concatMapStrings
-    concatMapStringsSep
     concatStringsSep
     escapeShellArg
     escapeShellArgs
@@ -133,17 +132,15 @@ let
     ++ [ c.image ]
     ++ c.cmd;
 
-  # The runtime's own resources this container uses, which the runtime agent
-  # creates once the apiserver is up.
+  # The runtime's own resources this container uses. The runtime agent creates
+  # them at login, but one deleted afterwards would otherwise leave this
+  # container unstartable until the next activation, so it creates them too.
   declaredNetworks = c: intersectLists c.networks (attrNames runtime.network);
   declaredVolumes =
     c: intersectLists (map (v: head (splitString ":" v)) c.volumes) (attrNames runtime.volume);
+  usesRuntimeResources = c: declaredNetworks c != [ ] || declaredVolumes c != [ ];
 
-  readinessChecks =
-    c:
-    [ "system status" ]
-    ++ map (n: "network inspect ${escapeShellArg n}") (declaredNetworks c)
-    ++ map (v: "volume inspect ${escapeShellArg v}") (declaredVolumes c);
+  ensureResources = runtime.ensureScript;
   readinessTimeout = 120;
 
   startScript =
@@ -154,7 +151,7 @@ let
 
       # launchd has no ordering between jobs: wait for the runtime agent.
       ready() {
-        ${concatMapStringsSep " && " (check: "${container} ${check} >/dev/null 2>&1") (readinessChecks c)}
+        ${container} system status >/dev/null 2>&1
       }
       deadline=$((SECONDS + ${toString readinessTimeout}))
       until ready; do
@@ -165,6 +162,7 @@ let
         sleep 1
       done
 
+      ${optionalString (usesRuntimeResources c) ensureResources}
       ${c.apple-container.preStart}
 
       ${optionalString (c.imageFile != null) ''

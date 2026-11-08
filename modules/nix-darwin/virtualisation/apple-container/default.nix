@@ -166,6 +166,15 @@ let
         '') cfg.system.kernel
       )}
     ''}
+    ${ensureResources}
+  '';
+
+  # The declared networks and volumes, created when missing. Both this agent
+  # at login and every container's own agent run it, so one deleted while the
+  # runtime is up comes back with whoever needs it next, rather than only at
+  # the next activation.
+  ensureResources = pkgs.writeShellScript "apple-container-ensure" ''
+    set -euo pipefail
     ${converge "network" "network list" (
       name: n:
       [
@@ -359,6 +368,17 @@ in
       description = ''
         Named volumes to create, as {command}`container volume create`.
         Never updated or deleted.
+      '';
+    };
+
+    ensureScript = mkOption {
+      internal = true;
+      type = types.package;
+      default = ensureResources;
+      description = ''
+        Script creating whichever declared networks and volumes are missing.
+        Run by the runtime agent, and by each container's agent for the ones
+        it uses, so deleting one does not strand the containers that need it.
       '';
     };
 

@@ -25,6 +25,7 @@ let
       {
         system.primaryUser = lib.mkForce user;
         virtualisation.apple-container.network.${name} = { };
+        virtualisation.apple-container.volume.${name} = { };
         virtualisation.oci-containers = {
           logDir = "${dir}/log";
           stateDir = "${dir}/state";
@@ -54,6 +55,7 @@ let
               "600"
             ];
             networks = [ name ];
+            volumes = [ "${name}:/data" ];
           };
         };
       }
@@ -107,6 +109,7 @@ makeTest {
     launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
     container delete --force "$NAME" "$NAME-gated" >/dev/null 2>&1 || true
     container network delete "$NAME" >/dev/null 2>&1 || true
+    container volume delete "$NAME" >/dev/null 2>&1 || true
     rm -rf "$DIR"
   '';
   tests = {
@@ -148,19 +151,26 @@ makeTest {
       refute_output --partial 'idle for'
       assert_equal "$(state "$NAME")" running
     '';
-    "a container waits for the runtime's networks it uses" = ''
+    "a container recreates the runtime's networks and volumes it uses once they are deleted" = ''
+      container delete --force "$NAME-gated" >/dev/null 2>&1 || true
       container network delete "$NAME" >/dev/null 2>&1 || true
+      container volume delete "$NAME" >/dev/null 2>&1 || true
+      refute container network inspect "$NAME"
+      refute container volume inspect "$NAME"
+
       ${gated} >"$DIR/gated.log" 2>&1 3>&- &
       gated=$!
-      sleep 5
-      kill -0 "$gated"
-      [ -z "$(state "$NAME-gated")" ]
-      container network create "$NAME" >/dev/null
       deadline=$((SECONDS + 120))
       until [ "$(state "$NAME-gated")" = running ]; do
         [ "$SECONDS" -lt "$deadline" ] || fail "$NAME-gated never ran: $(cat "$DIR/gated.log")"
         sleep 1
       done
+      container network inspect "$NAME" >/dev/null
+      container volume inspect "$NAME" >/dev/null
+      run cat "$DIR/gated.log"
+      assert_output --partial "creating network $NAME"
+      assert_output --partial "creating volume $NAME"
+
       container delete --force "$NAME-gated" >/dev/null
       kill "$gated" 2>/dev/null || true
     '';

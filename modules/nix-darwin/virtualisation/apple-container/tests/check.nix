@@ -17,6 +17,7 @@ let
     ];
   activation = s: name: text "${name}-activation" s.config.system.activationScripts.${name}.text;
   runtime = s: text "apple-container-runtime" (s.script "apple-container");
+  ensure = s: text "apple-container-ensure" s.config.virtualisation.apple-container.ensureScript.text;
 
   plain = enabled { };
   full = enabled {
@@ -69,6 +70,8 @@ makeTest {
     "the runtime agent's scripts are valid bash" = ''
       assert_bash ${runtime plain}
       assert_bash ${runtime full}
+      assert_bash ${ensure plain}
+      assert_bash ${ensure full}
       assert_bash ${activation full "postActivation"}
     '';
     "without a kernel, the runtime installs its recommended one" = ''
@@ -84,15 +87,19 @@ makeTest {
       assert_output --regexp 'if \[ ! -e "\$state/kernel-arm64-[0-9a-f]{12}" \]'
       assert_output --regexp 'touch "\$state/kernel-amd64-[0-9a-f]{12}"'
     '';
-    "networks and volumes are created after the runtime starts, only when missing" = ''
-      run cat ${runtime full}
+    "networks and volumes are created by the ensure script, only when missing" = ''
+      run cat ${ensure full}
       assert_output --partial "network create --subnet-v6 fd12:3456:789a::/64 --internal --option 'mtu=1400' --label 'role=ipv6' v6"
       assert_output --partial "volume create -s 64G --label 'role=cache' cache"
       assert_output --partial "network list --format json"
       assert_output --partial "--arg id v6 'any(.[]; .id == \$id)'"
+    '';
+    "the runtime agent ensures them once it has started the apiserver" = ''
+      run cat ${runtime full}
+      assert_output --partial ${esc full.config.virtualisation.apple-container.ensureScript}
       start="$(grep -n 'system start' <<<"$output" | head -1 | cut -d: -f1)"
-      create="$(grep -n 'network create' <<<"$output" | head -1 | cut -d: -f1)"
-      [ "$start" -lt "$create" ]
+      ensure="$(grep -n ${esc full.config.virtualisation.apple-container.ensureScript} <<<"$output" | head -1 | cut -d: -f1)"
+      [ "$start" -lt "$ensure" ]
     '';
     "the default domain is written to config.toml before the runtime starts" = ''
       run cat ${runtime plain}

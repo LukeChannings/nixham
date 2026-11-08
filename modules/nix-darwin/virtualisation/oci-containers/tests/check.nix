@@ -12,6 +12,7 @@ let
     text "${name}-proxy"
       s.config.virtualisation.oci-containers.containers.${name}.apple-container.onDemand.proxy.text;
   listener = port: (full.daemon "oci-container-ssh-proxy-${toString port}").serviceConfig;
+  ensure = full.config.virtualisation.apple-container.ensureScript;
 
   webapp = {
     image = "nginx:1.25";
@@ -199,18 +200,22 @@ makeTest {
       refute_output --partial MKNOD
       refute_output --partial -- --privileged
     '';
-    "the agent waits for the apiserver, and the runtime's networks and volumes it uses, before anything else" =
-      ''
-        run cat ${script full "webapp"}
-        assert_output --regexp 'container system status >/dev/null 2>&1 && [^ ]*container network inspect v6 >/dev/null 2>&1 && [^ ]*container volume inspect cache >/dev/null 2>&1'
-        refute_output --partial 'network inspect default'
-        ready="$(grep -n '^until ready' <<<"$output" | cut -d: -f1)"
-        hook="$(grep -n '^echo pre-start-hook' <<<"$output" | cut -d: -f1)"
-        load="$(grep -n 'image load' <<<"$output" | cut -d: -f1)"
-        [ "$ready" -lt "$hook" ] && [ "$hook" -lt "$load" ]
-        run cat ${script full "private"}
-        assert_output --regexp 'ready\(\) \{'$'\n'"  [^ ]*container system status >/dev/null 2>&1"$'\n'"\}"
-      '';
+    "the agent waits for the apiserver alone, then creates the runtime resources it uses" = ''
+      run cat ${script full "webapp"}
+      assert_output --regexp 'ready\(\) \{'$'\n'"  [^ ]*container system status >/dev/null 2>&1"$'\n'"\}"
+      refute_output --partial 'volume inspect'
+      refute_output --partial 'network inspect'
+      assert_output --partial ${esc ensure}
+      ready="$(grep -n '^until ready' <<<"$output" | cut -d: -f1)"
+      creates="$(grep -n ${esc ensure} <<<"$output" | cut -d: -f1)"
+      hook="$(grep -n '^echo pre-start-hook' <<<"$output" | cut -d: -f1)"
+      load="$(grep -n 'image load' <<<"$output" | cut -d: -f1)"
+      [ "$ready" -lt "$creates" ] && [ "$creates" -lt "$hook" ] && [ "$hook" -lt "$load" ]
+    '';
+    "a container using none of the runtime's networks or volumes creates nothing" = ''
+      run cat ${script full "private"}
+      refute_output --partial ${esc ensure}
+    '';
     "an image file is loaded only while its image is absent" = ''
       run cat ${script full "webapp"}
       assert_output --regexp 'if ! [^ ]*container image inspect nginx:1.25 >/dev/null 2>&1; then'$'\n'"  [^ ]*container image load --input /nix/store/[^ ]*-nginx.tar"
