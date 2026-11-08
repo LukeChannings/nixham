@@ -116,5 +116,21 @@ scope {
       stop
       boot "$REF_A"
     '';
+    "a DB that lost the closure behind a surviving stamp is re-seeded, and GC keeps the system" = ''
+      boot "$REF_A"
+      system="$(x 'readlink -f /run/booted-system')"
+      x 'rm -f /nix/var/nix/db/db.sqlite*'
+      run x 'cat /nix/var/nix/linux-builder-seeded-system'
+      assert_output "$system"
+      stop
+
+      boot "$REF_A"
+      run logs
+      assert_output --partial 'seeding the Nix DB'
+      x 'nix-collect-garbage -d' >/dev/null
+      x 'nix-store -qR /run/booted-system | while read -r p; do [ -e "$p" ] || { echo "missing $p"; exit 1; }; done'
+      stop
+      boot "$REF_A"
+    '';
   };
 }

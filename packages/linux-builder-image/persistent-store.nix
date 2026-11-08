@@ -25,7 +25,8 @@ let
 
   # Which system the Nix DB was last seeded (and reconciled) for. It sits next
   # to the DB, so it lives exactly as long as the DB does: on the volume when
-  # persistent, in the container's rootfs when not.
+  # persistent, in the container's rootfs when not. Only a hint all the same:
+  # see the registration check below.
   seededStamp = "/nix/var/nix/linux-builder-seeded-system";
 
   # Written through /nix by the shutdown hook, so it lands in the overlay's
@@ -91,8 +92,25 @@ let
     # builder's own system out of the merged view. Only needed when the DB
     # has not yet been seeded for this system, which keeps it off every
     # same-image restart's path to sshd.
+    #
+    # The stamp cannot decide that alone: it and the DB merely share a
+    # lifetime, so a DB that lost the registration behind a surviving stamp
+    # would skip seeding for good. Registration in the DB -- what GC
+    # consults -- has the last word, and a desynchronised stamp self-heals.
+    #
+    # A volume torn down dirty can also keep db/schema while losing the
+    # db.sqlite beside it. Nix reads the schema as "already initialised" and
+    # opens the DB without SQLITE_OPEN_CREATE, so every call fails for good
+    # with `cannot open SQLite database`. The pair is all or nothing: drop
+    # the orphan and let the seeding rebuild both.
+    if [ -e /nix/var/nix/db/schema ] && [ ! -e /nix/var/nix/db/db.sqlite ]; then
+      log "WARN the Nix DB kept its schema but lost db.sqlite; rebuilding it"
+      rm -f /nix/var/nix/db/schema
+    fi
+
     system="$(readlink -f /run/booted-system)"
-    if [ "$(cat ${seededStamp} 2>/dev/null || true)" != "$system" ]; then
+    registered() { ${nixBin}/nix-store --check-validity "$system" 2>/dev/null; }
+    if [ "$(cat ${seededStamp} 2>/dev/null || true)" != "$system" ] || ! registered; then
       log "seeding the Nix DB for $system"
       if ${nixBin}/nix-store --load-db < ${registration}; then
         # nixos-rebuild-style "system" profile; older generations point at
@@ -119,6 +137,8 @@ let
         log "ERROR could not seed the Nix DB from ${registration}"
       fi
     fi
+
+    registered || log "ERROR $system is unregistered in the Nix DB; THE NEXT GC DELETES THIS BUILDER"
   '';
 
   # systemd, detecting a container, neither syncs nor unmounts file systems on
