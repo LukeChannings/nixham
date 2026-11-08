@@ -46,7 +46,11 @@ let
       ]
     }
     # Nothing here builds, and userborn has yet to create the nixbld group.
-    export NIX_CONFIG="build-users-group ="
+    # `store = local` because systemd is yet to start: `auto` resolves to the
+    # daemon whenever /nix/var/nix is unwritable and a socket inode survives
+    # on the volume, and the seeding below then fails against a daemon that
+    # cannot exist yet, leaving the system unregistered on every boot.
+    export NIX_CONFIG=$'build-users-group =\nstore = local'
 
     log() { echo "linux-builder: $*" >&2; }
 
