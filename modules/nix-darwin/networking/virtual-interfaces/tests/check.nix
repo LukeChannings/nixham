@@ -3,6 +3,7 @@
   makeTest,
   darwin,
   dash,
+  jq,
 }:
 let
   inherit (darwin) esc json text;
@@ -60,6 +61,72 @@ let
       : >"$FAKE_LOG"
       vi
       [ ! -s "$FAKE_LOG" ] && [ ! -s "$BATS_TEST_TMPDIR/stderr" ]
+    '';
+    "a cold boot gives each bridge to SystemConfiguration" = ''
+      vi || fail "$(cat "$BATS_TEST_TMPDIR/stderr")"
+      assert_equal "$(registration bridge40)" '["vlan40","feth51","feth53"]'
+      assert_equal "$(registration bridge41)" '["vlan41","feth61"]'
+      run ! grep -q "scutil set /NetworkServices" "$FAKE_LOG"
+    '';
+    "the service macOS adds to a bridge is disabled, and no other service ever changes" = ''
+      vi
+      macos_adds_service "$bridge40_service" bridge40
+      macos_adds_service "$bridge400_service" bridge400
+      prefs ".NetworkServices[\"$wifi\", \"$tb\", \"$bridge400_service\"].__INACTIVE__ = true"
+      before=$(others)
+      : >"$FAKE_LOG"
+      for tick in 1 2 3; do
+        vi || fail "tick $tick: $(cat "$BATS_TEST_TMPDIR/stderr")"
+        [ "$(others)" = "$before" ] || fail "tick $tick touched another service: $(cat "$FAKE_LOG")"
+      done
+      assert_equal "$(inactive "$bridge40_service")" true
+      assert_equal "$(grep -c "scutil set /NetworkServices/" "$FAKE_LOG")" 1
+    '';
+    "a service macOS adds late is disabled without re-arming a leg" = ''
+      vi
+      macos_adds_service "$bridge40_service" bridge40
+      : >"$FAKE_LOG"
+      vi || fail "$(cat "$BATS_TEST_TMPDIR/stderr")"
+      assert_equal "$(inactive "$bridge40_service")" true
+      grep -q "disabling network service $bridge40_service on bridge40" "$BATS_TEST_TMPDIR/stderr"
+      run ! grep -Eq "lladdr|ipconfig set" "$FAKE_LOG"
+      : >"$FAKE_LOG"
+      vi
+      [ ! -s "$FAKE_LOG" ] && [ ! -s "$BATS_TEST_TMPDIR/stderr" ]
+    '';
+    "services on bridges whose names contain the uplink's are left alone" = ''
+      vi
+      macos_adds_service "$bridge4_service" bridge4
+      macos_adds_service "$bridge400_service" bridge400
+      : >"$FAKE_LOG"
+      vi
+      [ ! -s "$FAKE_LOG" ] && [ ! -s "$BATS_TEST_TMPDIR/stderr" ]
+      assert_equal "$(inactive "$bridge4_service")" null
+      assert_equal "$(inactive "$bridge400_service")" null
+    '';
+    "a registration counts even when scutil misreports it" = ''
+      FAKE_SCUTIL_LIES=1 vi || fail "$(cat "$BATS_TEST_TMPDIR/stderr")"
+      assert_equal "$(registration bridge40)" '["vlan40","feth51","feth53"]'
+    '';
+    "a reaped registration is restored, and no leg re-armed" = ''
+      vi
+      prefs 'del(.VirtualNetworkInterfaces.Bridge.bridge40)'
+      : >"$FAKE_LOG"
+      vi || fail "$(cat "$BATS_TEST_TMPDIR/stderr")"
+      assert_equal "$(registration bridge40)" '["vlan40","feth51","feth53"]'
+      grep -q "registering bridge40" "$BATS_TEST_TMPDIR/stderr"
+      run ! grep -Eq "lladdr|ipconfig set" "$FAKE_LOG"
+    '';
+    "a registration that fails does not hold the legs back" = ''
+      FAKE_SCUTIL_FAIL=1 run ! vi
+      member bridge40 feth51 && member bridge40 feth53
+      [ -e "$FAKE_NET/feth50/lease" ] && [ -e "$FAKE_NET/feth50/v6" ]
+    '';
+    "a registration listing stale members is rewritten" = ''
+      vi
+      prefs '.VirtualNetworkInterfaces.Bridge.bridge40.Interfaces = ["vlan40", "feth51"]'
+      vi || fail "$(cat "$BATS_TEST_TMPDIR/stderr")"
+      assert_equal "$(registration bridge40)" '["vlan40","feth51","feth53"]'
     '';
     "a leg vmnet detached is repaired, and only it re-armed" = ''
       vi
@@ -131,7 +198,10 @@ let
 in
 makeTest {
   name = "virtual-interfaces";
-  inputs = [ dash ];
+  inputs = [
+    dash
+    jq
+  ];
   helpers = [
     ''
       vi() {
@@ -141,14 +211,54 @@ makeTest {
       member() {
         grep -qx "$2" "$FAKE_NET/$1/members"
       }
+
+      # Services in the fixture, and ones macOS would add.
+      wifi=00000000-0000-0000-0000-000000000001
+      tb=00000000-0000-0000-0000-000000000002
+      bridge40_service=00000000-0000-0000-0000-000000000040
+      bridge4_service=00000000-0000-0000-0000-000000000004
+      bridge400_service=00000000-0000-0000-0000-000000000400
+
+      # prefs <jq filter>: edit SystemConfiguration's preferences.
+      prefs() {
+        jq "$1" "$FAKE_PREFS" >"$FAKE_PREFS.new"
+        mv "$FAKE_PREFS.new" "$FAKE_PREFS"
+      }
+
+      # macos_adds_service <uuid> <bridge>: the service macOS adds to a bridge
+      # it owns.
+      macos_adds_service() {
+        prefs ".NetworkServices[\"$1\"] = {
+          DNS: {}, IPv4: {ConfigMethod: \"DHCP\"}, IPv6: {ConfigMethod: \"Automatic\"},
+          Interface: {DeviceName: \"$2\", Hardware: \"Ethernet\", Type: \"Ethernet\", UserDefinedName: \"Bridge ($2)\"},
+          Proxies: {ExceptionsList: [\"*.local\", \"169.254/16\"], FTPPassive: 1}, SMB: {},
+          UserDefinedName: \"Bridge ($2)\"
+        }"
+      }
+
+      registration() {
+        jq -c --arg b "$1" '.VirtualNetworkInterfaces.Bridge[$b].Interfaces' "$FAKE_PREFS"
+      }
+
+      inactive() {
+        jq --arg u "$1" '.NetworkServices[$u].__INACTIVE__' "$FAKE_PREFS"
+      }
+
+      # Every service but the bridge40 one.
+      others() {
+        jq -S --arg u "$bridge40_service" '.NetworkServices | del(.[$u])' "$FAKE_PREFS"
+      }
     ''
   ];
   setup = ''
     stub ${./stubs}
     sed -e "s|^PATH=.*|PATH=$PATH|" -e "s|^state_dir=.*|state_dir=$BATS_TEST_TMPDIR/state|" \
+      -e "s|^prefs=.*|prefs=$BATS_TEST_TMPDIR/prefs|" \
       ${script} >"$BATS_TEST_TMPDIR/virtual-interfaces"
     export FAKE_NET="$BATS_TEST_TMPDIR/net" FAKE_LOG="$BATS_TEST_TMPDIR/log"
     export FAKE_SYSCTL="$BATS_TEST_TMPDIR/sysctl"
+    export FAKE_PREFS="$BATS_TEST_TMPDIR/prefs"
+    install -m 0644 ${./preferences.json} "$FAKE_PREFS"
     mkdir -p "$FAKE_NET/en0" "$FAKE_NET/en1"
     touch "$FAKE_NET/en0/up" "$FAKE_NET/en1/up" "$FAKE_LOG"
   '';
@@ -175,6 +285,8 @@ makeTest {
       run cat ${script}
       assert_line --index 0 '#!/bin/sh'
       refute_output --partial /nix/store
+      assert_line --partial '40 en0 vlan40 feth51 feth53'
+      assert_line --partial '41 en1 vlan41 feth61'
       assert_line --partial 'feth50 feth51 40 en0 02:4c:4c:4d:00:01 1 1'
       assert_line --partial 'feth52 feth53 40 en0 02:47:52:47:00:01 1 0'
       assert_line --partial 'feth60 feth61 41 en1 02:00:00:00:00:60 0 1'

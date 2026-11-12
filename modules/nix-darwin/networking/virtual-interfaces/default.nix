@@ -35,6 +35,7 @@ let
   installedScript = "/usr/local/libexec/nix-darwin/virtual-interfaces";
   # /var/run is emptied at boot, so a leg without a stamp is (re)armed.
   stateDir = "/var/run/nix-darwin-virtual-interfaces";
+  scPreferences = "/Library/Preferences/SystemConfiguration/preferences.plist";
 
   validName = name: builtins.match "feth(0|[1-9][0-9]*)" name != null;
   unitOf = name: toInt (removePrefix "feth" name);
@@ -54,6 +55,8 @@ let
     inherit tag;
     inherit (head tagLegs) parent;
     parents = unique (map (leg: leg.parent) tagLegs);
+    # The order the script bridges them in, which configd holds it to.
+    members = [ "vlan${tag}" ] ++ map (leg: leg.peer) tagLegs;
   }) (groupBy (leg: leg.tag) legs);
 
   script = pkgs.writeText "virtual-interfaces" ''
@@ -61,8 +64,11 @@ let
     PATH=/usr/bin:/bin:/usr/sbin:/sbin
     export PATH
     state_dir=${stateDir}
+    prefs=${scPreferences}
     stable_v6=${b2s (any (l: l.ipv6 == "1") legs)}
-    uplinks='${concatMapStringsSep "\n" (u: "${u.tag} ${u.parent}") uplinks}'
+    uplinks='${
+      concatMapStringsSep "\n" (u: "${u.tag} ${u.parent} ${concatStringsSep " " u.members}") uplinks
+    }'
     legs='${
       concatMapStringsSep "\n" (
         l: "${l.name} ${l.peer} ${l.tag} ${l.parent} ${l.mac} ${l.dhcp} ${l.ipv6}"
@@ -166,7 +172,11 @@ in
       The `virtual-interfaces` launchd daemon plumbs the legs from a script
       on the root volume, so they come up seconds after boot rather than
       once /nix mounts. It runs again at every activation, and every 30
-      seconds to repair legs vmnet detaches.
+      seconds to repair the plumbing.
+
+      Each `bridge<vlanId>` is registered with SystemConfiguration, which
+      otherwise destroys it the moment anything publishes a new network
+      interface — as every VM start does, through vmnet.
 
       A removed leg is no longer managed, but stays up until reboot.
     '';

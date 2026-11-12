@@ -1,6 +1,7 @@
 # Runs from the root volume, before /nix mounts (see launchd's ADR-0001).
-# Expects $state_dir, $uplinks ("<tag> <parent>" lines), $legs
-# ("<feth> <peer> <tag> <parent> <mac> <dhcp> <ipv6>" lines) and $stable_v6.
+# Expects $state_dir, $prefs, $uplinks ("<tag> <parent> <member>..." lines),
+# $legs ("<feth> <peer> <tag> <parent> <mac> <dhcp> <ipv6>" lines) and
+# $stable_v6.
 
 log() {
   echo "virtual-interfaces: $*" >&2
@@ -51,12 +52,54 @@ stamp_ok() {
   [ "$(cat "$state_dir/$1" 2>/dev/null)" = "$2" ]
 }
 
-# uplink_ok <tag> <parent>
+# configd's InterfaceNamer destroys every bridge SystemConfiguration's
+# preferences do not list, so anything that starts a VM (vmnet publishes an
+# ephemeral interface, and naming one runs the reconcile) takes an
+# unregistered uplink down with it. See _SCBridgeInterfaceUpdateConfiguration
+# in configd's BridgeConfiguration.c.
+
+# registered <bridge> <member>...: the preferences list exactly these members.
+# Order matters: given a different first member, configd removes them all and
+# re-adds them itself, which it cannot do for a feth or a vlan. Byte-comparing
+# plutil's compact JSON errs safe: a new rendering re-registers loudly each tick.
+registered() {
+  r_bridge=$1
+  shift
+  r_want=$(printf '"%s",' "$@")
+  [ "$(plutil -extract "VirtualNetworkInterfaces.Bridge.$r_bridge.Interfaces" \
+    json -o - "$prefs" 2>/dev/null)" = "[${r_want%,}]" ]
+}
+
+# service_key <service> <key>: one of a network service's settings.
+service_key() {
+  plutil -extract "NetworkServices.$1.$2" raw -o - "$prefs" 2>/dev/null
+}
+
+# live_services <device>: the enabled network services on exactly <device>.
+# macOS adds one for every bridge it owns, minutes after taking it over, and
+# left enabled it runs a second DHCP client on the legs' network under the
+# bridge's own MAC. Found by key rather than in networksetup's listing, which
+# marks a disabled service in a way that was once misread as belonging to the
+# service above it, disabling every service up to the host's own Ethernet.
+live_services() {
+  for v_service in $(plutil -extract NetworkServices raw -o - "$prefs" 2>/dev/null); do
+    [ "$(service_key "$v_service" Interface.DeviceName)" = "$1" ] &&
+      [ "$(service_key "$v_service" __INACTIVE__)" != true ] &&
+      echo "$v_service"
+  done
+}
+
+# uplink_ok <tag> <parent> <member>...
 uplink_ok() {
-  vlan_ok "vlan$1" "$1" "$2" &&
-    is_up "vlan$1" &&
-    is_up "bridge$1" &&
-    is_member "bridge$1" "vlan$1"
+  o_tag=$1
+  o_parent=$2
+  shift 2
+  vlan_ok "vlan$o_tag" "$o_tag" "$o_parent" &&
+    is_up "vlan$o_tag" &&
+    is_up "bridge$o_tag" &&
+    is_member "bridge$o_tag" "vlan$o_tag" &&
+    registered "bridge$o_tag" "$@" &&
+    [ -z "$(live_services "bridge$o_tag")" ]
 }
 
 # leg_ok <feth> <peer> <tag> <dhcp> <ipv6> <spec>
@@ -71,8 +114,9 @@ leg_ok() {
 }
 
 healthy() {
-  while read -r h_tag h_parent <&3; do
-    uplink_ok "$h_tag" "$h_parent" || return 1
+  while read -r h_tag h_parent h_members <&3; do
+    # shellcheck disable=SC2086
+    uplink_ok "$h_tag" "$h_parent" $h_members || return 1
   done 3<<EOT
 $uplinks
 EOT
@@ -84,12 +128,33 @@ $legs
 EOT
 }
 
-# ensure_uplink <tag> <parent>: vlan<tag> on <parent>, in bridge<tag>.
+# register <bridge> <member>...: hand the bridge to SystemConfiguration.
+# scutil's exit status does not follow whether the preferences took, so read
+# them back instead of trusting it.
+register() {
+  g_bridge=$1
+  shift
+  printf 'open\nd.init\nd.add Interfaces * %s\nset /VirtualNetworkInterfaces/Bridge/%s\ncommit\napply\nquit\n' \
+    "$*" "$g_bridge" | scutil --prefs >/dev/null
+  registered "$g_bridge" "$@"
+}
+
+# disable <service>: what `networksetup -setnetworkserviceenabled off` does,
+# to that service alone.
+disable() {
+  printf 'open\nget /NetworkServices/%s\nd.add __INACTIVE__ ? TRUE\nset /NetworkServices/%s\ncommit\napply\nquit\n' \
+    "$1" "$1" | scutil --prefs >/dev/null
+  [ "$(service_key "$1" __INACTIVE__)" = true ]
+}
+
+# ensure_uplink <tag> <parent> <member>...: vlan<tag> on <parent>, in
+# bridge<tag>, which SystemConfiguration owns.
 ensure_uplink() {
   u_tag=$1
   u_parent=$2
   u_vlan=vlan$1
   u_bridge=bridge$1
+  shift 2
 
   u_waited=0
   while ! has_if "$u_parent"; do
@@ -131,6 +196,21 @@ ensure_uplink() {
     ifconfig "$u_vlan" vlan "$u_tag" vlandev "$u_parent" || return 1
   fi
   ifconfig "$u_vlan" up || return 1
+
+  # Registering first lets configd create the bridge itself. An unregistered
+  # bridge still carries traffic until the next VM starts, so a failure here
+  # must not hold the legs back.
+  if ! registered "$u_bridge" "$@"; then
+    log "registering $u_bridge with SystemConfiguration"
+    register "$u_bridge" "$@" || status=1
+  fi
+
+  # macOS adds the service long after taking the bridge over, so this is the
+  # poller's job, not something to wait for here.
+  for u_service in $(live_services "$u_bridge"); do
+    log "disabling network service $u_service on $u_bridge"
+    disable "$u_service" || status=1
+  done
 
   if ! has_if "$u_bridge"; then
     log "creating $u_bridge"
@@ -246,8 +326,9 @@ mkdir -p "$state_dir"
 status=0
 broken=
 
-while read -r tag parent <&3; do
-  if ! ensure_uplink "$tag" "$parent"; then
+while read -r tag parent members <&3; do
+  # shellcheck disable=SC2086
+  if ! ensure_uplink "$tag" "$parent" $members; then
     log "uplink vlan$tag/bridge$tag on $parent failed"
     broken="$broken $tag "
     status=1

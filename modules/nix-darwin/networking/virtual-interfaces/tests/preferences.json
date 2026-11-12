@@ -1,0 +1,120 @@
+{
+  "__VERSION__": 20191120,
+  "NetworkServices": {
+    "00000000-0000-0000-0000-000000000005": {
+      "DNS": {},
+      "UserDefinedName": "Ethernet",
+      "IPv6": {
+        "ConfigMethod": "Automatic"
+      },
+      "Interface": {
+        "Type": "Ethernet",
+        "DeviceName": "en0",
+        "Hardware": "Ethernet",
+        "UserDefinedName": "Ethernet"
+      },
+      "IPv4": {
+        "ConfigMethod": "DHCP"
+      },
+      "SMB": {},
+      "Proxies": {
+        "ExceptionsList": ["*.local", "169.254/16"],
+        "FTPPassive": 1
+      }
+    },
+    "00000000-0000-0000-0000-000000000001": {
+      "DNS": {},
+      "UserDefinedName": "Wi-Fi",
+      "IPv6": {
+        "ConfigMethod": "LinkLocal"
+      },
+      "Interface": {
+        "Type": "Ethernet",
+        "DeviceName": "en1",
+        "Hardware": "AirPort",
+        "UserDefinedName": "Wi-Fi"
+      },
+      "IPv4": {
+        "ConfigMethod": "DHCP"
+      },
+      "SMB": {},
+      "Proxies": {
+        "ExceptionsList": ["*.local", "169.254/16"],
+        "FTPPassive": 1
+      }
+    },
+    "00000000-0000-0000-0000-000000000002": {
+      "DNS": {},
+      "UserDefinedName": "Thunderbolt Bridge",
+      "IPv6": {
+        "ConfigMethod": "Automatic"
+      },
+      "Interface": {
+        "Type": "Ethernet",
+        "DeviceName": "bridge0",
+        "Hardware": "Ethernet",
+        "UserDefinedName": "Thunderbolt Bridge"
+      },
+      "IPv4": {
+        "ConfigMethod": "DHCP"
+      },
+      "SMB": {},
+      "Proxies": {
+        "ExceptionsList": ["*.local", "169.254/16"],
+        "FTPPassive": 1
+      }
+    },
+    "00000000-0000-0000-0000-000000000003": {
+      "DNS": {
+        "__INACTIVE__": true
+      },
+      "UserDefinedName": "VPN",
+      "IPv6": {
+        "ConfigMethod": "Automatic"
+      },
+      "Interface": {
+        "SubType": "com.example.vpn",
+        "Type": "VPN"
+      },
+      "IPv4": {
+        "ConfigMethod": "VPN"
+      },
+      "SMB": {},
+      "Proxies": {
+        "FTPPassive": 1
+      }
+    },
+    "00000000-0000-0000-0000-000000000006": {
+      "DNS": {},
+      "UserDefinedName": "Hidden Adapter",
+      "IPv6": {
+        "ConfigMethod": "Automatic"
+      },
+      "Interface": {
+        "Type": "Ethernet",
+        "HiddenConfiguration": true,
+        "DeviceName": "en5",
+        "Hardware": "Ethernet",
+        "UserDefinedName": "Hidden Adapter"
+      },
+      "IPv4": {
+        "ConfigMethod": "DHCP"
+      },
+      "SMB": {},
+      "Proxies": {
+        "ExceptionsList": ["*.local", "169.254/16"],
+        "FTPPassive": 1
+      }
+    }
+  },
+  "VirtualNetworkInterfaces": {
+    "Bridge": {
+      "bridge0": {
+        "Options": {
+          "__AUTO__": "thunderbolt-bridge"
+        },
+        "Interfaces": ["en2", "en3"]
+      }
+    }
+  }
+}

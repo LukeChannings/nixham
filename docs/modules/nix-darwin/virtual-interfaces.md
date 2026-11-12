@@ -16,7 +16,11 @@ lease; its peer, `feth(N+1)`, joins `bridge<vlanId>`, which carries a
 The `virtual-interfaces` launchd daemon plumbs the legs from a script
 on the root volume, so they come up seconds after boot rather than
 once /nix mounts. It runs again at every activation, and every 30
-seconds to repair legs vmnet detaches.
+seconds to repair the plumbing.
+
+Each `bridge<vlanId>` is registered with SystemConfiguration, which
+otherwise destroys it the moment anything publishes a new network
+interface — as every VM start does, through vmnet.
 
 A removed leg is no longer managed, but stays up until reboot.
 
