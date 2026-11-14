@@ -220,6 +220,15 @@ ensure_uplink() {
   ifconfig "$u_bridge" up
 }
 
+# arm <leg> <none> <method>: (re)start <method>'s client. configd frees the
+# services `ipconfig set` makes on an interface its preferences don't
+# configure whenever any interface comes or goes, as vmnet's do on every VM
+# start and stop; it keeps setService's. See interface_configuration_changed
+# in bootp's ipconfigd.c.
+arm() {
+  ipconfig set "$1" "$2" && ipconfig setService "$1" "$3" >/dev/null
+}
+
 # ensure_leg <feth> <peer> <tag> <mac> <dhcp> <ipv6> <spec>
 ensure_leg() {
   l_host=$1
@@ -274,18 +283,18 @@ ensure_leg() {
     # A network change can tear down an ipconfig service on its own.
     if [ "$l_ipv6" = 1 ] && ! has_v6 "$l_host"; then
       log "re-arming IPv6 on $l_host"
-      ipconfig set "$l_host" AUTOMATIC-V6 || return 1
+      arm "$l_host" NONE-V6 AUTOMATIC-V6 || return 1
     fi
     return 0
   fi
 
   l_status=0
   if [ "$l_dhcp" = 1 ]; then
-    # configd takes ~3s from BOUND to publish a lease, and every
-    # `ipconfig set` restarts its client: arm once and poll, re-arming only
-    # once the client gives up (and downs the interface), or every 20s.
+    # configd takes ~3s from BOUND to publish a lease, and every arm
+    # restarts its client: arm once and poll, re-arming only once the client
+    # gives up (and downs the interface), or every 20s.
     ifconfig "$l_host" up
-    ipconfig set "$l_host" DHCP
+    arm "$l_host" NONE DHCP
     l_tries=0
     while ! is_leased "$l_host"; do
       if [ "$l_tries" -ge 30 ]; then
@@ -297,7 +306,7 @@ ensure_leg() {
       l_tries=$((l_tries + 1))
       if ! is_up "$l_host" || [ $((l_tries % 10)) = 0 ]; then
         ifconfig "$l_host" up
-        ipconfig set "$l_host" DHCP
+        arm "$l_host" NONE DHCP
       fi
     done
   else
@@ -305,7 +314,7 @@ ensure_leg() {
   fi
 
   if [ "$l_ipv6" = 1 ]; then
-    ipconfig set "$l_host" AUTOMATIC-V6 || l_status=1
+    arm "$l_host" NONE-V6 AUTOMATIC-V6 || l_status=1
   else
     ipconfig set "$l_host" NONE-V6 || l_status=1
   fi

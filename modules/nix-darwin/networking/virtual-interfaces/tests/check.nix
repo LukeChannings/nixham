@@ -53,11 +53,18 @@ let
       [ -e "$FAKE_NET/feth50/lease" ] && [ -e "$FAKE_NET/feth52/lease" ]
       [ -e "$FAKE_NET/feth50/v6" ] && [ ! -e "$FAKE_NET/feth52/v6" ] && [ -e "$FAKE_NET/feth60/v6" ]
       [ -e "$FAKE_NET/feth60/up" ] && [ ! -e "$FAKE_NET/feth60/lease" ]
-      run ! grep -q "ipconfig set feth60 DHCP" "$FAKE_LOG"
+      run ! grep -q "feth60 DHCP" "$FAKE_LOG"
       assert_equal "$(cat "$FAKE_SYSCTL")" 0
     '';
     "a healthy tick changes and logs nothing" = ''
       vi
+      : >"$FAKE_LOG"
+      vi
+      [ ! -s "$FAKE_LOG" ] && [ ! -s "$BATS_TEST_TMPDIR/stderr" ]
+    '';
+    "a VM starting leaves every leg armed" = ''
+      vi
+      vm_starts
       : >"$FAKE_LOG"
       vi
       [ ! -s "$FAKE_LOG" ] && [ ! -s "$BATS_TEST_TMPDIR/stderr" ]
@@ -89,7 +96,7 @@ let
       vi || fail "$(cat "$BATS_TEST_TMPDIR/stderr")"
       assert_equal "$(inactive "$bridge40_service")" true
       grep -q "disabling network service $bridge40_service on bridge40" "$BATS_TEST_TMPDIR/stderr"
-      run ! grep -Eq "lladdr|ipconfig set" "$FAKE_LOG"
+      run ! grep -Eq "lladdr|ipconfig" "$FAKE_LOG"
       : >"$FAKE_LOG"
       vi
       [ ! -s "$FAKE_LOG" ] && [ ! -s "$BATS_TEST_TMPDIR/stderr" ]
@@ -115,7 +122,7 @@ let
       vi || fail "$(cat "$BATS_TEST_TMPDIR/stderr")"
       assert_equal "$(registration bridge40)" '["vlan40","feth51","feth53"]'
       grep -q "registering bridge40" "$BATS_TEST_TMPDIR/stderr"
-      run ! grep -Eq "lladdr|ipconfig set" "$FAKE_LOG"
+      run ! grep -Eq "lladdr|ipconfig" "$FAKE_LOG"
     '';
     "a registration that fails does not hold the legs back" = ''
       FAKE_SCUTIL_FAIL=1 run ! vi
@@ -138,9 +145,9 @@ let
       vi || fail "$(cat "$BATS_TEST_TMPDIR/stderr")"
       member bridge40 feth51 && member bridge40 feth53
       [ -e "$FAKE_NET/feth50/up" ] && [ -e "$FAKE_NET/feth50/lease" ]
-      grep -q "ipconfig set feth50 DHCP" "$FAKE_LOG"
-      grep -q "ipconfig set feth50 AUTOMATIC-V6" "$FAKE_LOG"
-      run ! grep -q "ipconfig set feth52" "$FAKE_LOG"
+      grep -q "ipconfig setService feth50 DHCP" "$FAKE_LOG"
+      grep -q "ipconfig setService feth50 AUTOMATIC-V6" "$FAKE_LOG"
+      run ! grep -q "^ipconfig [^ ]* feth52" "$FAKE_LOG"
       run ! grep -q create "$FAKE_LOG"
     '';
     "a reverted prefer_tempaddr is repinned without a replumb" = ''
@@ -157,7 +164,7 @@ let
       rm "$FAKE_NET/feth50/v6"
       : >"$FAKE_LOG"
       vi
-      assert_equal "$(grep '^ipconfig' "$FAKE_LOG")" "ipconfig set feth50 AUTOMATIC-V6"
+      assert_equal "$(grep '^ipconfig' "$FAKE_LOG" | tr '\n' ,)" "ipconfig set feth50 NONE-V6,ipconfig setService feth50 AUTOMATIC-V6,"
       run ! grep -Eq "lladdr|create|addm|deletem|vlan " "$FAKE_LOG"
     '';
     "ipv6 = false disarms a leftover IPv6 service" = ''
@@ -180,7 +187,7 @@ let
     '';
     "DHCP is retried, then left to the poller" = ''
       FAKE_DHCP_FAIL=1 run ! vi
-      assert_equal "$(grep -c "ipconfig set feth50 DHCP" "$FAKE_LOG")" 4
+      assert_equal "$(grep -c "ipconfig setService feth50 DHCP" "$FAKE_LOG")" 4
       grep -q "no DHCPv4 lease on feth50 after 60s" "$BATS_TEST_TMPDIR/stderr"
       vi
       [ -e "$FAKE_NET/feth50/lease" ]
@@ -188,7 +195,7 @@ let
     "a slow lease is waited for, not re-armed away" = ''
       FAKE_DHCP_DELAY=3 vi || fail "$(cat "$BATS_TEST_TMPDIR/stderr")"
       [ -e "$FAKE_NET/feth50/lease" ] && [ -e "$FAKE_NET/feth52/lease" ]
-      assert_equal "$(grep -c "ipconfig set feth50 DHCP" "$FAKE_LOG")" 1
+      assert_equal "$(grep -c "ipconfig setService feth50 DHCP" "$FAKE_LOG")" 1
     '';
   };
   shells = {
@@ -234,6 +241,19 @@ makeTest {
           Proxies: {ExceptionsList: [\"*.local\", \"169.254/16\"], FTPPassive: 1}, SMB: {},
           UserDefinedName: \"Bridge ($2)\"
         }"
+      }
+
+      # vm_starts: what configd does to every interface the preferences don't
+      # configure whenever one comes or goes, as vmnet's do.
+      vm_starts() {
+        for d in "$FAKE_NET"/*; do
+          if [ "$(cat "$d/v4" 2>/dev/null)" = set ]; then
+            rm -f "$d/v4" "$d/lease" "$d/pending" "$d/up"
+          fi
+          if [ "$(cat "$d/v6" 2>/dev/null)" = set ]; then
+            rm -f "$d/v6" "$d/up"
+          fi
+        done
       }
 
       registration() {

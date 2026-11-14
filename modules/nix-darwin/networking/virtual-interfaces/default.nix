@@ -126,10 +126,10 @@ let
         type = types.bool;
         default = true;
         description = ''
-          Whether to arm IPv6 with `ipconfig set <if> AUTOMATIC-V6`. With a
-          managed RA this takes a stateful DHCPv6 address; macOS SLAAC only
-          forms RFC 7217 identifiers, never EUI-64. Without one the leg gets
-          only SLAAC and link-local addresses.
+          Whether to arm IPv6 with `ipconfig setService <if> AUTOMATIC-V6`.
+          With a managed RA this takes a stateful DHCPv6 address; macOS SLAAC
+          only forms RFC 7217 identifiers, never EUI-64. Without one the leg
+          gets only SLAAC and link-local addresses.
 
           Any leg with IPv6 also pins the host to stable source addresses
           (`net.inet6.ip6.prefer_tempaddr=0`): temporary addresses
