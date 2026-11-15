@@ -24,6 +24,7 @@ rec {
   garage = module "garage" ./services/garage [ ];
   launchd-logging = module "launchd-logging" ./launchd/logging [ ];
   launchd-wait4path = module "launchd-wait4path" ./launchd/wait4path [ ];
+  networking-hosts = module "networking-hosts" ./networking/hosts [ ];
   virtual-interfaces = module "virtual-interfaces" ./networking/virtual-interfaces [ ];
   pki-keychain = module "pki-keychain" ./security/pki-keychain [ ];
   zsh = module "zsh" ./programs/zsh [ ];
@@ -36,6 +37,7 @@ rec {
     launchd-wait4path
     linux-builder
     litellm
+    networking-hosts
     nginx
     ollama
     pki-keychain
