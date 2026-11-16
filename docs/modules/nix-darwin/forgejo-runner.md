@@ -42,17 +42,53 @@ pkgs.forgejo-runner
 
 - [\<nixham/modules/nix-darwin/services/forgejo-runner/default.nix>](../../../modules/nix-darwin/services/forgejo-runner/default.nix)
 
-## services.forgejo-runner.capacity
+## services.forgejo-runner.drainTimeout
 
-Maximum number of concurrent jobs.
+Seconds a stopping runner is given to finish the jobs it has claimed
+before it cancels them.
+
+It bounds the race the idle check cannot see: a task CLAIMED but not
+yet spawned has no process, so it reads as idle. At zero – act_runner’s
+own default – a restart landing in that window kills the job with
+“context canceled”. Drives both `runner.shutdown_timeout` and launchd’s
+`ExitTimeOut`, which gets a further minute before it SIGKILLs.
 
 *Type:*
-signed integer
+positive integer, meaning >0
 
 *Default:*
 
 ```nix
-1
+600
+```
+
+*Declared by:*
+
+- [\<nixham/modules/nix-darwin/services/forgejo-runner/default.nix>](../../../modules/nix-darwin/services/forgejo-runner/default.nix)
+
+## services.forgejo-runner.environment
+
+Environment variables exported to the runner, and so to the jobs it
+executes.
+
+Deliberately not `launchd.daemons.forgejo-runner.environment`:
+that lands in the plist, and the plist must stay generation-stable.
+
+*Type:*
+attribute set of string
+
+*Default:*
+
+```nix
+{ }
+```
+
+*Example:*
+
+```nix
+{
+  GIT_CONFIG_SYSTEM = "/etc/gitconfig";
+}
 ```
 
 *Declared by:*
@@ -101,6 +137,74 @@ config.networking.hostName
 
 - [\<nixham/modules/nix-darwin/services/forgejo-runner/default.nix>](../../../modules/nix-darwin/services/forgejo-runner/default.nix)
 
+## services.forgejo-runner.path
+
+Packages added to the runner’s `PATH`, after the module’s own and
+before launchd’s. A `:host` runner executes jobs with no container, so
+this is the environment every step on this host starts from.
+
+Deliberately not `launchd.daemons.forgejo-runner.path`: that
+lands in the plist, and the plist must stay generation-stable.
+
+*Type:*
+list of (absolute path or string)
+
+*Default:*
+
+```nix
+[ ]
+```
+
+*Example:*
+
+```nix
+lib.mkAfter [ pkgs.git ]
+```
+
+*Declared by:*
+
+- [\<nixham/modules/nix-darwin/services/forgejo-runner/default.nix>](../../../modules/nix-darwin/services/forgejo-runner/default.nix)
+
+## services.forgejo-runner.reconcile.enable
+
+Whether to enable rolling the runner onto the current generation once it is idle.
+
+*Type:*
+boolean
+
+*Default:*
+
+```nix
+true
+```
+
+*Example:*
+
+```nix
+true
+```
+
+*Declared by:*
+
+- [\<nixham/modules/nix-darwin/services/forgejo-runner/default.nix>](../../../modules/nix-darwin/services/forgejo-runner/default.nix)
+
+## services.forgejo-runner.reconcile.interval
+
+Seconds between idle checks.
+
+*Type:*
+positive integer, meaning >0
+
+*Default:*
+
+```nix
+300
+```
+
+*Declared by:*
+
+- [\<nixham/modules/nix-darwin/services/forgejo-runner/default.nix>](../../../modules/nix-darwin/services/forgejo-runner/default.nix)
+
 ## services.forgejo-runner.secretFile
 
 File holding the runner’s shared secret, for `act_runner create-runner-file --secret`.
@@ -114,15 +218,100 @@ absolute path
 
 ## services.forgejo-runner.settings
 
-Extra keys of the runner’s config.yaml.
+The runner’s config.yaml: [https://forgejo.org/docs/latest/admin/actions/#configuration](https://forgejo.org/docs/latest/admin/actions/#configuration).
 
 *Type:*
-attribute set of anything
+open submodule of (YAML 1.1 value)
 
 *Default:*
 
 ```nix
 { }
+```
+
+*Declared by:*
+
+- [\<nixham/modules/nix-darwin/services/forgejo-runner/default.nix>](../../../modules/nix-darwin/services/forgejo-runner/default.nix)
+
+## services.forgejo-runner.settings.cache.enabled
+
+Whether the runner serves actions/cache from its own cache server.
+
+*Type:*
+boolean
+
+*Default:*
+
+```nix
+false
+```
+
+*Declared by:*
+
+- [\<nixham/modules/nix-darwin/services/forgejo-runner/default.nix>](../../../modules/nix-darwin/services/forgejo-runner/default.nix)
+
+## services.forgejo-runner.settings.log.level
+
+The runner’s log level.
+
+*Type:*
+string
+
+*Default:*
+
+```nix
+"info"
+```
+
+*Declared by:*
+
+- [\<nixham/modules/nix-darwin/services/forgejo-runner/default.nix>](../../../modules/nix-darwin/services/forgejo-runner/default.nix)
+
+## services.forgejo-runner.settings.runner
+
+The config.yaml `runner` section.
+
+*Type:*
+open submodule of (YAML 1.1 value)
+
+*Default:*
+
+```nix
+{ }
+```
+
+*Declared by:*
+
+- [\<nixham/modules/nix-darwin/services/forgejo-runner/default.nix>](../../../modules/nix-darwin/services/forgejo-runner/default.nix)
+
+## services.forgejo-runner.settings.runner.capacity
+
+Maximum number of concurrent jobs.
+
+*Type:*
+positive integer, meaning >0
+
+*Default:*
+
+```nix
+1
+```
+
+*Declared by:*
+
+- [\<nixham/modules/nix-darwin/services/forgejo-runner/default.nix>](../../../modules/nix-darwin/services/forgejo-runner/default.nix)
+
+## services.forgejo-runner.settings.runner.shutdown_timeout
+
+How long a stopping runner finishes its claimed jobs for. Set `drainTimeout` instead: launchd’s patience is derived from it.
+
+*Type:*
+string
+
+*Default:*
+
+```nix
+"${toString config.services.forgejo-runner.drainTimeout}s"
 ```
 
 *Declared by:*
